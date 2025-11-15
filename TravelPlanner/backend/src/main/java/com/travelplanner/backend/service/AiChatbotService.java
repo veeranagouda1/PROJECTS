@@ -23,14 +23,14 @@ public class AiChatbotService {
 
     public AiChatbotService() {
         this.webClient = WebClient.builder()
-                .baseUrl("https://generativelanguage.googleapis.com/v1beta/models")
+                .baseUrl("https://generativelanguage.googleapis.com/v1")
                 .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                 .build();
     }
 
     public String getChatResponse(String userMessage, String context) {
         try {
-            String url = String.format("/%s:generateContent?key=%s", model, apiKey);
+            String url = String.format("/models/%s:generateContent?key=%s", model, apiKey);
 
             // Build request body correctly
             Map<String, Object> requestBody = new HashMap<>();

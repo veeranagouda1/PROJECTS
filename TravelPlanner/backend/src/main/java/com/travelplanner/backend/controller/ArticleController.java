@@ -6,6 +6,8 @@ import org.springframework.web.bind.annotation.*;
 
 import com.travelplanner.backend.model.Article;
 import com.travelplanner.backend.service.ArticleService;
+import java.util.Map;
+import org.springframework.web.bind.annotation.RequestParam;
 
 import java.util.List;
 
@@ -45,6 +47,19 @@ public class ArticleController {
     public ResponseEntity<Void> deleteArticle(@PathVariable Long id) {
         articleService.deleteArticle(id);
         return ResponseEntity.ok().build();
+    }
+
+    @GetMapping("/live")
+    public ResponseEntity<List<Article>> getLiveArticles() {
+        return ResponseEntity.ok(articleService.fetchLiveArticles());
+    }
+
+    @GetMapping("/online")
+    public ResponseEntity<Map<String, Object>> getOnlineArticles(
+            @RequestParam(required = false) String category,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ResponseEntity.ok(articleService.fetchOnlineArticles(category, page, size));
     }
 }
 

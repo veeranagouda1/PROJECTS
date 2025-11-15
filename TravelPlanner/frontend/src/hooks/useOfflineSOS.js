@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { initDB, addToQueue, getQueue, clearQueue, removeFromQueue } from '../utils/db';
+import { initDB, addToQueue, getQueue, removeFromQueue, updateQueueItem } from '../utils/db';
+import api from '../api/axios';
 
 export const useOfflineSOS = (isOnline) => {
   const [queue, setQueue] = useState([]);
@@ -41,37 +42,37 @@ export const useOfflineSOS = (isOnline) => {
     }
   }, [queue]);
 
-  const processQueue = useCallback(async (api) => {
+  const processQueue = useCallback(async () => {
     if (!isOnline || isProcessing || queue.length === 0) return;
 
     setIsProcessing(true);
     setError(null);
 
     try {
-      for (const item of queue) {
-        if (item.status === 'PENDING') {
-          try {
-            const response = await api.post('/sos/offline-alert', {
-              lastOfflineLat: item.lastLat,
-              lastOfflineLng: item.lastLng,
-              offlineStart: item.offlineStart,
-              deviceInfo: item.deviceInfo,
-              currentLat: item.currentLat,
-              currentLng: item.currentLng,
-            });
+      const pendingItems = queue.filter(item => item.status === 'PENDING');
+      for (const item of pendingItems) {
+        try {
+          const response = await api.post('/sos', {
+            latitude: item.latitude,
+            longitude: item.longitude,
+            message: item.message || 'Emergency SOS request',
+            isOffline: false,
+          });
 
-            if (response.status === 200) {
-              await removeFromQueue(item.id);
-              setQueue(queue.filter(q => q.id !== item.id));
-              console.log('[useOfflineSOS] SOS sent successfully:', item.id);
-            }
-          } catch (err) {
-            item.retries = (item.retries || 0) + 1;
-            if (item.retries >= 3) {
-              await removeFromQueue(item.id);
-              setQueue(queue.filter(q => q.id !== item.id));
-            }
-            console.error('Error sending SOS:', err);
+          if (response.status === 200 || response.status === 201) {
+            await removeFromQueue(item.id);
+            setQueue(prev => prev.filter(q => q.id !== item.id));
+            console.log('[useOfflineSOS] SOS sent successfully:', item.id);
+          }
+        } catch (err) {
+          const retries = (item.retries || 0) + 1;
+          if (retries >= 3) {
+            await removeFromQueue(item.id);
+            setQueue(prev => prev.filter(q => q.id !== item.id));
+            console.error('[useOfflineSOS] Max retries reached, removing:', item.id);
+          } else {
+            await updateQueueItem(item.id, { retries });
+            console.warn('[useOfflineSOS] Retry', retries, 'for item:', item.id);
           }
         }
       }
@@ -82,9 +83,9 @@ export const useOfflineSOS = (isOnline) => {
 
   useEffect(() => {
     if (isOnline && queue.length > 0) {
-      processQueue(window.__api);
+      processQueue();
     }
-  }, [isOnline, queue, processQueue]);
+  }, [isOnline, queue.length, processQueue]);
 
   return {
     queue,

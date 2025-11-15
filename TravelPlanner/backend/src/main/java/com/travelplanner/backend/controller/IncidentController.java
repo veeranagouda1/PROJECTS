@@ -73,5 +73,10 @@ public class IncidentController {
         incidentService.deleteIncident(id);
         return ResponseEntity.ok().build();
     }
+
+    @GetMapping("/live")
+    public ResponseEntity<List<Map<String, Object>>> getLiveIncidents() {
+        return ResponseEntity.ok(incidentService.getLiveIncidentsForHeatmap());
+    }
 }
 

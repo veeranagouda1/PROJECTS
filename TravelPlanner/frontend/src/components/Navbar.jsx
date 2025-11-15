@@ -2,10 +2,12 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import api from '../api/axios';
 import Notifications from './Notifications';
+import { useTheme } from '../contexts/ThemeContext';
 
 const Navbar = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
+  const { isDark, toggleTheme } = useTheme();
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -24,155 +26,172 @@ const Navbar = () => {
     navigate('/login');
   };
 
+  const menuItemStyle = {
+    color: 'white',
+    textDecoration: 'none',
+    fontWeight: '500',
+    transition: 'all 0.3s ease',
+    opacity: 0.9,
+    padding: '6px 10px',
+    borderRadius: '6px',
+  };
+
+  const menuHover = (e) => {
+    e.target.style.opacity = '1';
+    e.target.style.textShadow = '0 2px 8px rgba(0,0,0,0.2)';
+    e.target.style.backgroundColor = 'rgba(255,255,255,0.2)';
+  };
+
+  const menuOut = (e) => {
+    e.target.style.opacity = '0.9';
+    e.target.style.textShadow = 'none';
+    e.target.style.backgroundColor = 'transparent';
+  };
+
   return (
     <nav
       style={{
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        background: isDark
+          ? 'rgba(10, 10, 25, 0.7)'
+          : 'linear-gradient(135deg, #4C2AFF 0%, #8B5DFF 100%)',
         padding: '15px 30px',
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
+        flexWrap: 'wrap',
         marginBottom: '30px',
-        boxShadow: '0 4px 20px rgba(102, 126, 234, 0.3)',
+        boxShadow: isDark
+          ? '0 4px 20px rgba(0,0,0,0.5)'
+          : '0 4px 20px rgba(76, 42, 255, 0.3)',
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
+        borderBottom: isDark
+          ? '1px solid rgba(255,255,255,0.05)'
+          : '1px solid rgba(255, 255, 255, 0.2)',
+        borderRadius: '0 0 15px 15px',
+        transition: '0.3s ease-in-out',
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: '30px' }}>
+      {/* LEFT MENU */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '25px',
+          flexWrap: 'wrap',
+        }}
+      >
         <Link
           to="/dashboard"
           style={{
-            color: 'white',
-            textDecoration: 'none',
+            ...menuItemStyle,
             fontSize: '24px',
             fontWeight: 'bold',
             letterSpacing: '0.5px',
-            transition: 'all 0.3s ease',
           }}
-          onMouseEnter={(e) => e.target.style.textShadow = '0 2px 10px rgba(0,0,0,0.2)'}
-          onMouseLeave={(e) => e.target.style.textShadow = 'none'}
+          onMouseEnter={menuHover}
+          onMouseLeave={menuOut}
         >
           ✈️ Travel Planner
         </Link>
-        <Link
-          to="/planner"
-          style={{ 
-            color: 'white', 
-            textDecoration: 'none', 
-            fontWeight: '500',
-            transition: 'all 0.3s ease',
-            opacity: 0.9,
-          }}
-          onMouseEnter={(e) => { e.target.style.opacity = '1'; e.target.style.textShadow = '0 2px 8px rgba(0,0,0,0.1)'; }}
-          onMouseLeave={(e) => { e.target.style.opacity = '0.9'; e.target.style.textShadow = 'none'; }}
-        >
+
+        <Link to="/planner" style={menuItemStyle} onMouseEnter={menuHover} onMouseLeave={menuOut}>
           Planner
         </Link>
-        <Link
-          to="/budget"
-          style={{ 
-            color: 'white', 
-            textDecoration: 'none',
-            fontWeight: '500',
-            transition: 'all 0.3s ease',
-            opacity: 0.9,
-          }}
-          onMouseEnter={(e) => { e.target.style.opacity = '1'; e.target.style.textShadow = '0 2px 8px rgba(0,0,0,0.1)'; }}
-          onMouseLeave={(e) => { e.target.style.opacity = '0.9'; e.target.style.textShadow = 'none'; }}
-        >
+
+        <Link to="/budget" style={menuItemStyle} onMouseEnter={menuHover} onMouseLeave={menuOut}>
           Budget
         </Link>
-        <Link
-          to="/chatbot"
-          style={{ 
-            color: 'white', 
-            textDecoration: 'none',
-            fontWeight: '500',
-            transition: 'all 0.3s ease',
-            opacity: 0.9,
-          }}
-          onMouseEnter={(e) => { e.target.style.opacity = '1'; e.target.style.textShadow = '0 2px 8px rgba(0,0,0,0.1)'; }}
-          onMouseLeave={(e) => { e.target.style.opacity = '0.9'; e.target.style.textShadow = 'none'; }}
-        >
+
+        <Link to="/chatbot" style={menuItemStyle} onMouseEnter={menuHover} onMouseLeave={menuOut}>
           Chatbot
         </Link>
-        <Link
-          to="/geofence"
-          style={{ 
-            color: 'white', 
-            textDecoration: 'none',
-            fontWeight: '500',
-            transition: 'all 0.3s ease',
-            opacity: 0.9,
-          }}
-          onMouseEnter={(e) => { e.target.style.opacity = '1'; e.target.style.textShadow = '0 2px 8px rgba(0,0,0,0.1)'; }}
-          onMouseLeave={(e) => { e.target.style.opacity = '0.9'; e.target.style.textShadow = 'none'; }}
-        >
+
+        <Link to="/geofence" style={menuItemStyle} onMouseEnter={menuHover} onMouseLeave={menuOut}>
           Safety Map
         </Link>
-        <Link
-          to="/articles"
-          style={{ 
-            color: 'white', 
-            textDecoration: 'none',
-            fontWeight: '500',
-            transition: 'all 0.3s ease',
-            opacity: 0.9,
-          }}
-          onMouseEnter={(e) => { e.target.style.opacity = '1'; e.target.style.textShadow = '0 2px 8px rgba(0,0,0,0.1)'; }}
-          onMouseLeave={(e) => { e.target.style.opacity = '0.9'; e.target.style.textShadow = 'none'; }}
-        >
+
+        <Link to="/articles" style={menuItemStyle} onMouseEnter={menuHover} onMouseLeave={menuOut}>
           Articles
         </Link>
+
+        {/* ⭐ NEW — EMERGENCY CONTACTS */}
+        <Link
+          to="/emergency-contacts"
+          style={{ ...menuItemStyle, fontWeight: '600' }}
+          onMouseEnter={menuHover}
+          onMouseLeave={menuOut}
+        >
+          📞 Emergency Contacts
+        </Link>
+
+        {/* POLICE ROLE */}
         {user?.role === 'POLICE' && (
           <Link
             to="/police"
-            style={{ 
-              color: 'white', 
-              textDecoration: 'none',
-              fontWeight: '500',
-              transition: 'all 0.3s ease',
-              opacity: 0.9,
-            }}
-            onMouseEnter={(e) => { e.target.style.opacity = '1'; e.target.style.textShadow = '0 2px 8px rgba(0,0,0,0.1)'; }}
-            onMouseLeave={(e) => { e.target.style.opacity = '0.9'; e.target.style.textShadow = 'none'; }}
+            style={menuItemStyle}
+            onMouseEnter={menuHover}
+            onMouseLeave={menuOut}
           >
             Police Dashboard
           </Link>
         )}
+
+        {/* ADMIN ROLE */}
         {user?.role === 'ADMIN' && (
           <Link
             to="/admin"
-            style={{ 
-              color: 'white', 
-              textDecoration: 'none',
-              fontWeight: '500',
-              transition: 'all 0.3s ease',
-              opacity: 0.9,
-            }}
-            onMouseEnter={(e) => { e.target.style.opacity = '1'; e.target.style.textShadow = '0 2px 8px rgba(0,0,0,0.1)'; }}
-            onMouseLeave={(e) => { e.target.style.opacity = '0.9'; e.target.style.textShadow = 'none'; }}
+            style={menuItemStyle}
+            onMouseEnter={menuHover}
+            onMouseLeave={menuOut}
           >
             Admin
           </Link>
         )}
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+
+      {/* RIGHT MENU */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '20px', marginTop: '10px' }}>
+        {/* Dark Mode Button */}
+        <button
+          onClick={toggleTheme}
+          style={{
+            background: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(255, 255, 255, 0.25)',
+            border: 'none',
+            borderRadius: '50%',
+            width: '42px',
+            height: '42px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            fontSize: '20px',
+            transition: 'all 0.3s ease',
+            color: 'white',
+          }}
+          onMouseEnter={(e) => (e.target.style.transform = 'scale(1.1)')}
+          onMouseLeave={(e) => (e.target.style.transform = 'scale(1)')}
+          title={isDark ? 'Light Mode' : 'Dark Mode'}
+        >
+          {isDark ? '☀️' : '🌙'}
+        </button>
+
         <Notifications />
+
         <Link
           to="/profile"
-          style={{ 
-            color: 'white', 
-            textDecoration: 'none',
-            fontWeight: '500',
-            transition: 'all 0.3s ease',
-            opacity: 0.9,
+          style={{
+            ...menuItemStyle,
             padding: '8px 15px',
             borderRadius: '8px',
+            backgroundColor: 'rgba(255,255,255,0.15)',
           }}
-          onMouseEnter={(e) => { e.target.style.opacity = '1'; e.target.style.backgroundColor = 'rgba(255,255,255,0.2)'; }}
-          onMouseLeave={(e) => { e.target.style.opacity = '0.9'; e.target.style.backgroundColor = 'transparent'; }}
+          onMouseEnter={menuHover}
+          onMouseLeave={menuOut}
         >
-          👤 {user?.name || 'Profile'}
+          👤 {user?.fullName || 'Profile'}
         </Link>
+
         <button
           onClick={handleLogout}
           style={{
@@ -203,4 +222,3 @@ const Navbar = () => {
 };
 
 export default Navbar;
-

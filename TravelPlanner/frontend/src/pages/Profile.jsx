@@ -9,8 +9,9 @@ const Profile = () => {
   const [editing, setEditing] = useState(false);
   const [toast, setToast] = useState(null);
   const [formData, setFormData] = useState({
+    fullName: '',
     bio: '',
-    phone: '',
+    phoneNumber: '',
     profileImageUrl: '',
   });
 
@@ -23,8 +24,9 @@ const Profile = () => {
       const response = await api.get('/user/me');
       setUser(response.data);
       setFormData({
+        fullName: response.data.fullName || '',
         bio: response.data.bio || '',
-        phone: response.data.phone || '',
+        phoneNumber: response.data.phoneNumber || '',
         profileImageUrl: response.data.profileImageUrl || '',
       });
     } catch (error) {
@@ -42,7 +44,7 @@ const Profile = () => {
     setLoading(true);
 
     try {
-      const response = await api.put('/user/me', formData);
+      const response = await api.put('/user/profile', formData);
       setUser(response.data);
       setEditing(false);
       showToast('Profile updated successfully');
@@ -109,12 +111,12 @@ const Profile = () => {
                     marginBottom: '20px',
                   }}
                 >
-                  {user.name?.charAt(0).toUpperCase() || 'U'}
+                  {(user.fullName || user.name)?.charAt(0).toUpperCase() || 'U'}
                 </div>
               )}
-              <h2>{user.name}</h2>
+              <h2>{user.fullName || user.name}</h2>
               <p>Email: {user.email}</p>
-              <p>Phone: {user.phone || 'Not set'}</p>
+              <p>Phone: {user.phoneNumber || 'Not set'}</p>
               <p>Role: {user.role}</p>
               {user.bio && (
                 <div style={{ marginTop: '20px' }}>
@@ -140,6 +142,16 @@ const Profile = () => {
         ) : (
           <form onSubmit={handleSubmit}>
             <div style={{ marginBottom: '20px' }}>
+              <label style={{ display: 'block', marginBottom: '5px' }}>Full Name:</label>
+              <input
+                type="text"
+                value={formData.fullName}
+                onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
+                style={{ width: '100%', padding: '8px' }}
+                placeholder="Enter your full name"
+              />
+            </div>
+            <div style={{ marginBottom: '20px' }}>
               <label style={{ display: 'block', marginBottom: '5px' }}>Profile Image URL:</label>
               <input
                 type="text"
@@ -162,8 +174,8 @@ const Profile = () => {
               <label style={{ display: 'block', marginBottom: '5px' }}>Phone:</label>
               <input
                 type="text"
-                value={formData.phone}
-                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                value={formData.phoneNumber}
+                onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
                 style={{ width: '100%', padding: '8px' }}
               />
             </div>

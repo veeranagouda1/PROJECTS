@@ -14,7 +14,7 @@ import com.travelplanner.backend.service.TripService;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/trip")
+@RequestMapping("/api/trips")
 @CrossOrigin(origins = "*")
 public class TripController {
     @Autowired

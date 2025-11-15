@@ -43,5 +43,5 @@ export const useOnlineStatus = () => {
     };
   }, [isOnline]);
 
-  return { isOnline, lastOfflineTime };
+  return isOnline; // Return boolean directly for simpler usage
 };

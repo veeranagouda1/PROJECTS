@@ -35,7 +35,7 @@ const BudgetPlanner = () => {
 
   const fetchTrips = async () => {
     try {
-      const response = await api.get('/trip/user');
+      const response = await api.get('/trips/user');
       setTrips(response.data);
     } catch (error) {
       console.error('Failed to fetch trips:', error);
@@ -64,7 +64,7 @@ const BudgetPlanner = () => {
         await api.put(`/budget/${editingBudget.id}`, payload);
         showToast('Budget updated successfully');
       } else {
-        await api.post('/budget/add', payload);
+        await api.post('/budget', payload);
         showToast('Expense added successfully');
       }
 

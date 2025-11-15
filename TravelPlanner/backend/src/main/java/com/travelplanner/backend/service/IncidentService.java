@@ -10,6 +10,9 @@ import com.travelplanner.backend.repository.UserRepository;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.stream.Collectors;
 
 @Service
 public class IncidentService {
@@ -68,6 +71,26 @@ public class IncidentService {
 
     public void deleteIncident(Long incidentId) {
         incidentRepository.deleteById(incidentId);
+    }
+
+    public List<Map<String, Object>> getLiveIncidentsForHeatmap() {
+        // Get recent incidents (last 24 hours)
+        List<Incident> recentIncidents = incidentRepository.findAll().stream()
+            .filter(incident -> {
+                if (incident.getReportedAt() == null) return false;
+                return incident.getReportedAt().isAfter(LocalDateTime.now().minusHours(24));
+            })
+            .collect(Collectors.toList());
+
+        return recentIncidents.stream().map(incident -> {
+            Map<String, Object> point = new HashMap<>();
+            point.put("lat", incident.getLatitude());
+            point.put("lng", incident.getLongitude());
+            point.put("severity", incident.getSeverity().name());
+            point.put("type", incident.getType().name());
+            point.put("id", incident.getId());
+            return point;
+        }).collect(Collectors.toList());
     }
 }
 

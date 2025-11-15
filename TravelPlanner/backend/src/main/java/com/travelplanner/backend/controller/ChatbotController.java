@@ -11,7 +11,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/ai")   // IMPORTANT FIX
+@RequestMapping("/api/chatbot")
 @CrossOrigin(origins = "*")
 public class ChatbotController {
 
@@ -23,7 +23,9 @@ public class ChatbotController {
         String response = aiChatbotService.chat(request);
 
         Map<String, String> result = new HashMap<>();
-        result.put("reply", response);  // must be "reply" because frontend expects response.data.reply
+        // Support both "reply" and "response" for compatibility
+        result.put("reply", response);
+        result.put("response", response);
 
         return ResponseEntity.ok(result);
     }

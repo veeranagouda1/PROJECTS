@@ -1,184 +1,253 @@
-import { useState, useEffect, useRef } from 'react';
-import api from '../api/axios';
-import Navbar from '../components/Navbar';
-import Toast from '../components/Toast';
+import { useState, useEffect, useRef } from "react";
+import api from "../api/axios";
+import Navbar from "../components/Navbar";
+import Toast from "../components/Toast";
+
+const MAX_HISTORY = 20; // prevent storage overflow
 
 const Chatbot = () => {
   const [messages, setMessages] = useState([]);
-  const [input, setInput] = useState('');
+  const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState(null);
-  const messagesEndRef = useRef(null);
+  const bottomRef = useRef(null);
 
+  // Load saved chat
   useEffect(() => {
-    // Load chat history from localStorage
-    const savedMessages = localStorage.getItem('chatbot_history');
-    if (savedMessages) {
-      try {
-        setMessages(JSON.parse(savedMessages));
-      } catch (e) {
-        console.error('Failed to load chat history:', e);
-      }
+    try {
+      const saved = localStorage.getItem("chatbot_history");
+      if (saved) setMessages(JSON.parse(saved));
+    } catch (e) {
+      console.warn("Failed to load stored messages");
+      localStorage.removeItem("chatbot_history");
     }
   }, []);
 
+  // Save safely
   useEffect(() => {
-    // Save chat history to localStorage
-    if (messages.length > 0) {
-      localStorage.setItem('chatbot_history', JSON.stringify(messages));
+    try {
+      const trimmed = messages.slice(-MAX_HISTORY);
+      localStorage.setItem("chatbot_history", JSON.stringify(trimmed));
+    } catch (err) {
+      console.warn("Storage full — clearing history.");
+      localStorage.removeItem("chatbot_history");
     }
     scrollToBottom();
   }, [messages]);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
+  const scrollToBottom = () =>
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
 
-  const showToast = (message, type = 'success') => {
-    setToast({ message, type });
+  const showToast = (msg, type = "error") => {
+    setToast({ message: msg, type });
     setTimeout(() => setToast(null), 3000);
   };
 
+  // === SEND MESSAGE ===
   const handleSend = async (e) => {
     e.preventDefault();
     if (!input.trim() || loading) return;
 
-    const userMessage = { role: 'user', content: input };
-    setMessages((prev) => [...prev, userMessage]);
-    setInput('');
+    const userMsg = { role: "user", content: input };
+    setMessages((prev) => [...prev, userMsg]);
+
+    const currentInput = input;
+    setInput("");
     setLoading(true);
 
     try {
-      const response = await api.post('/ai/chat', {
-        message: input,
-        history: messages.map((m) => m.content),
+      const res = await api.post("/chatbot/chat", {
+        message: currentInput,
+        context: messages.map((m) => m.content).join("\n"),
       });
 
-      const aiMessage = { role: 'assistant', content: response.data.reply };
-      setMessages((prev) => [...prev, aiMessage]);
-    } catch (error) {
-      showToast(error.response?.data?.error || 'Failed to get response', 'error');
-      setMessages((prev) => prev.slice(0, -1)); // Remove user message on error
+      const botReply =
+        res.data.reply ||
+        res.data.response ||
+        "I’m here! But I didn’t receive a proper response.";
+
+      const aiMsg = { role: "assistant", content: botReply };
+      setMessages((prev) => [...prev, aiMsg]);
+    } catch (err) {
+      showToast("Failed to get response from server", "error");
+      // Remove user message
+      setMessages((prev) => prev.slice(0, -1));
     } finally {
       setLoading(false);
     }
   };
 
+  // Clear history
   const clearHistory = () => {
-    if (window.confirm('Are you sure you want to clear chat history?')) {
+    if (window.confirm("Clear all chat history?")) {
       setMessages([]);
-      localStorage.removeItem('chatbot_history');
+      localStorage.removeItem("chatbot_history");
     }
   };
 
   return (
-    <div>
+    <div className="page-transition">
       <Navbar />
-      <div style={{ padding: '20px', maxWidth: '800px', margin: '0 auto' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-          <h1 style={{ color: 'black' }}>AI Travel Assistant</h1>
+
+      <div
+        style={{
+          padding: "20px",
+          maxWidth: "900px",
+          margin: "0 auto",
+        }}
+      >
+        {/* Title + Clear button */}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            marginBottom: "20px",
+          }}
+        >
+          <h1
+            style={{
+              background: "linear-gradient(135deg, #4C2AFF 0%, #8B5DFF 100%)",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+              fontSize: "2.4rem",
+              fontWeight: "bold",
+            }}
+          >
+            AI Travel Assistant
+          </h1>
+
           <button
             onClick={clearHistory}
             style={{
-              padding: '8px 15px',
-              backgroundColor: '#6c757d',
-              color: 'white',
-              border: 'none',
-              borderRadius: '5px',
-              cursor: 'pointer',
+              padding: "8px 14px",
+              borderRadius: "8px",
+              background: "#6c757d",
+              color: "white",
+              border: "none",
+              cursor: "pointer",
             }}
           >
-            Clear History
+            Clear
           </button>
         </div>
 
+        {/* Chat window */}
         <div
           style={{
-            border: '1px solid #ddd',
-            borderRadius: '5px',
-            height: '500px',
-            overflowY: 'auto',
-            padding: '20px',
-            marginBottom: '20px',
-            backgroundColor: '#f9f9f9',
+            height: "500px",
+            padding: "20px",
+            overflowY: "auto",
+            display: "flex",
+            flexDirection: "column",
+            gap: "15px",
           }}
+          className="card"
         >
           {messages.length === 0 ? (
-            <div style={{ textAlign: 'center', color: 'black', marginTop: '50%' }}>
-              <p style={{ color: 'black' }}>Start a conversation with the AI travel assistant!</p>
-              <p style={{ fontSize: '14px', marginTop: '10px', color: 'black' }}>
-                Ask about destinations, travel tips, or planning advice.
-              </p>
+            <div style={{ textAlign: "center", marginTop: "35%" }}>
+              <p>Start chatting with your AI assistant!</p>
             </div>
           ) : (
-            messages.map((msg, idx) => (
+            messages.map((msg, i) => (
               <div
-                key={idx}
+                key={i}
                 style={{
-                  marginBottom: '15px',
-                  display: 'flex',
-                  justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start',
+                  display: "flex",
+                  justifyContent:
+                    msg.role === "user" ? "flex-end" : "flex-start",
                 }}
               >
                 <div
                   style={{
-                    maxWidth: '70%',
-                    padding: '10px 15px',
-                    borderRadius: '10px',
-                    backgroundColor: msg.role === 'user' ? '#007bff' : 'white',
-                    color: msg.role === 'user' ? 'white' : 'black',
-                    border: msg.role === 'user' ? 'none' : '1px solid #ddd',
+                    maxWidth: "70%",
+                    padding: "12px 18px",
+                    borderRadius:
+                      msg.role === "user"
+                        ? "18px 18px 4px 18px"
+                        : "18px 18px 18px 4px",
+                    background:
+                      msg.role === "user"
+                        ? "linear-gradient(135deg, #4C2AFF, #8B5DFF)"
+                        : "rgba(255,255,255,0.9)",
+                    color: msg.role === "user" ? "white" : "#333",
+                    border:
+                      msg.role !== "user"
+                        ? "1px solid rgba(76,42,255,0.2)"
+                        : "none",
+                    boxShadow:
+                      msg.role === "user"
+                        ? "0 4px 12px rgba(76,42,255,0.3)"
+                        : "0 2px 8px rgba(0,0,0,0.1)",
+                    animation: "fadeIn 0.25s ease",
                   }}
                 >
-                  <span style={{ color: msg.role === 'user' ? 'white' : 'black' }}>{msg.content}</span>
+                  {msg.content}
                 </div>
               </div>
             ))
           )}
+
+          {/* Typing indicator */}
           {loading && (
-            <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: '15px' }}>
+            <div style={{ display: "flex" }}>
               <div
                 style={{
-                  padding: '10px 15px',
-                  borderRadius: '10px',
-                  backgroundColor: 'white',
-                  border: '1px solid #ddd',
+                  padding: "12px 18px",
+                  borderRadius: "18px 18px 18px 4px",
+                  background: "rgba(255,255,255,0.9)",
+                  border: "1px solid rgba(76,42,255,0.2)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
                 }}
               >
-                <span style={{ color: 'black' }}>Thinking...</span>
+                <span
+                  style={{
+                    width: "8px",
+                    height: "8px",
+                    borderRadius: "50%",
+                    background: "#4C2AFF",
+                    animation: "pulse 1s infinite",
+                  }}
+                ></span>
+                <span>Thinking...</span>
               </div>
             </div>
           )}
-          <div ref={messagesEndRef} />
+
+          <div ref={bottomRef} />
         </div>
 
-        <form onSubmit={handleSend}>
-          <div style={{ display: 'flex', gap: '10px' }}>
+        {/* Input */}
+        <form onSubmit={handleSend} style={{ marginTop: "15px" }}>
+          <div style={{ display: "flex", gap: "10px" }}>
             <input
-              type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Type your message..."
+              placeholder="Type a message..."
               style={{
                 flex: 1,
-                padding: '10px',
-                borderRadius: '5px',
-                border: '1px solid #ddd',
-                fontSize: '16px',
+                padding: "12px 18px",
+                borderRadius: "12px",
+                border: "2px solid rgba(76,42,255,0.2)",
+                background: "rgba(255,255,255,0.85)",
               }}
               disabled={loading}
             />
+
             <button
               type="submit"
               disabled={loading || !input.trim()}
               style={{
-                padding: '10px 20px',
-                backgroundColor: '#007bff',
-                color: 'white',
-                border: 'none',
-                borderRadius: '5px',
-                cursor: loading || !input.trim() ? 'not-allowed' : 'pointer',
-                fontSize: '16px',
+                padding: "12px 22px",
+                background:
+                  "linear-gradient(135deg, #4C2AFF 0%, #8B5DFF 100%)",
+                color: "white",
+                border: "none",
+                borderRadius: "12px",
+                cursor:
+                  loading || !input.trim() ? "not-allowed" : "pointer",
+                opacity: loading || !input.trim() ? 0.6 : 1,
               }}
             >
               Send
@@ -186,10 +255,16 @@ const Chatbot = () => {
           </div>
         </form>
       </div>
-      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
     </div>
   );
 };
 
 export default Chatbot;
-

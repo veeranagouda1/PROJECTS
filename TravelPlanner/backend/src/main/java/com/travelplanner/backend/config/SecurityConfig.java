@@ -56,17 +56,34 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-                .csrf(csrf -> csrf.disable())
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/auth/**").permitAll()  // Fully public - no authentication required
-                        .requestMatchers("/api/articles/public/**").permitAll()
-                        .requestMatchers("/error").permitAll()
-                        .anyRequest().authenticated()  // All other endpoints require authentication
-                )
-                .authenticationProvider(authenticationProvider())
-                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+            .csrf(csrf -> csrf.disable())
+            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+
+            .authorizeHttpRequests(auth -> auth
+
+                // ---------- PUBLIC ENDPOINTS ----------
+                .requestMatchers("/api/auth/**").permitAll()
+                .requestMatchers("/api/articles/public/**").permitAll()
+                .requestMatchers("/error").permitAll()
+                .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
+
+                // ---------- USER + POLICE + ADMIN ----------
+                .requestMatchers("/api/trips/**").hasAnyRole("TRAVELER", "POLICE", "ADMIN")
+                .requestMatchers("/api/budget/**").hasAnyRole("TRAVELER", "POLICE", "ADMIN")
+                .requestMatchers("/api/sos/**").hasAnyRole("TRAVELER", "POLICE", "ADMIN")
+                .requestMatchers("/api/emergency/**").hasAnyRole("TRAVELER", "POLICE", "ADMIN")
+                .requestMatchers("/api/geofence/**").hasAnyRole("TRAVELER", "POLICE", "ADMIN")
+
+                // ---------- ADMIN ONLY ----------
+                .requestMatchers("/api/admin/**").hasRole("ADMIN")
+
+                // Everything else → must be authenticated
+                .anyRequest().authenticated()
+            )
+
+            .authenticationProvider(authenticationProvider())
+            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
@@ -74,7 +91,11 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(List.of("http://localhost:5173", "http://localhost:3000", "http://127.0.0.1:5173"));
+        config.setAllowedOrigins(List.of(
+                "http://localhost:5173",
+                "http://127.0.0.1:5173",
+                "http://localhost:3000"
+        ));
         config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         config.setAllowedHeaders(Arrays.asList("*"));
         config.setAllowCredentials(true);

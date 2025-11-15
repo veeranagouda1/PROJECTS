@@ -15,11 +15,10 @@ export const EmergencyContactManager = () => {
     phone: '',
     email: '',
     relationship: '',
-    priority: 'SECONDARY',
-    canReceiveSms: true,
-    canReceiveEmail: true,
+    isPrimary: false,
   });
 
+  // Fetch Contacts on Load
   useEffect(() => {
     fetchContacts();
   }, []);
@@ -27,8 +26,8 @@ export const EmergencyContactManager = () => {
   const fetchContacts = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/contacts?page=0&size=50');
-      setContacts(response.data.content || []);
+      const response = await api.get('/emergency');
+      setContacts(response.data || []);
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to fetch contacts');
     } finally {
@@ -36,6 +35,7 @@ export const EmergencyContactManager = () => {
     }
   };
 
+  // Handle form input
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
     setFormData({
@@ -44,6 +44,7 @@ export const EmergencyContactManager = () => {
     });
   };
 
+  // Add or Update Contact
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
@@ -51,83 +52,51 @@ export const EmergencyContactManager = () => {
 
     try {
       if (editingId) {
-        await api.put(`/contacts/${editingId}`, formData);
+        await api.put(`/emergency/${editingId}`, formData);
         setSuccess('Contact updated successfully');
       } else {
-        await api.post('/contacts', formData);
+        await api.post('/emergency', formData);
         setSuccess('Contact added successfully');
       }
 
-      await fetchContacts();
+      fetchContacts();
       resetForm();
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to save contact');
     }
   };
 
+  // Edit Contact
   const handleEdit = (contact) => {
     setFormData(contact);
     setEditingId(contact.id);
     setShowForm(true);
   };
 
+  // Delete Contact
   const handleDelete = async (id) => {
     if (!window.confirm('Are you sure you want to delete this contact?')) return;
 
     try {
-      await api.delete(`/contacts/${id}`);
+      await api.delete(`/emergency/${id}`);
       setSuccess('Contact deleted successfully');
-      await fetchContacts();
+      fetchContacts();
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to delete contact');
     }
   };
 
-  const handleTestNotification = async (id, type = 'SMS') => {
-    try {
-      await api.post(`/contacts/${id}/test-notification?type=${type}`);
-      setSuccess(`Test ${type} notification sent`);
-    } catch (err) {
-      setError(err.response?.data?.message || 'Failed to send test notification');
-    }
-  };
-
+  // Reset form
   const resetForm = () => {
     setFormData({
       name: '',
       phone: '',
       email: '',
       relationship: '',
-      priority: 'SECONDARY',
-      canReceiveSms: true,
-      canReceiveEmail: true,
+      isPrimary: false,
     });
     setEditingId(null);
     setShowForm(false);
-  };
-
-  const getPriorityBadge = (priority) => {
-    const colors = {
-      PRIMARY: '#667eea',
-      SECONDARY: '#00d2fc',
-      TERTIARY: '#764ba2',
-      POLICE: '#ff6b6b',
-      HOSPITAL: '#51cf66',
-    };
-    return (
-      <span
-        style={{
-          backgroundColor: colors[priority],
-          color: 'white',
-          padding: '4px 8px',
-          borderRadius: '4px',
-          fontSize: '12px',
-          fontWeight: 'bold',
-        }}
-      >
-        {priority}
-      </span>
-    );
   };
 
   return (
@@ -146,7 +115,7 @@ export const EmergencyContactManager = () => {
         <div className="contact-form-modal">
           <div className="contact-form">
             <div className="form-header">
-              <h3>{editingId ? 'Edit' : 'Add New'} Emergency Contact</h3>
+              <h3>{editingId ? 'Edit Contact' : 'Add New Contact'}</h3>
               <button className="btn-close" onClick={resetForm}>×</button>
             </div>
 
@@ -170,13 +139,13 @@ export const EmergencyContactManager = () => {
                   name="phone"
                   value={formData.phone}
                   onChange={handleInputChange}
+                  placeholder="+1 555-123-4567"
                   required
-                  placeholder="+1 (555) 123-4567"
                 />
               </div>
 
               <div className="form-group">
-                <label>Email</label>
+                <label>Email (optional)</label>
                 <input
                   type="email"
                   name="email"
@@ -193,43 +162,19 @@ export const EmergencyContactManager = () => {
                   name="relationship"
                   value={formData.relationship}
                   onChange={handleInputChange}
-                  placeholder="Family/Friend/Doctor"
+                  placeholder="Family / Friend / Doctor"
                 />
               </div>
 
               <div className="form-group">
-                <label>Priority</label>
-                <select
-                  name="priority"
-                  value={formData.priority}
-                  onChange={handleInputChange}
-                >
-                  <option value="PRIMARY">Primary</option>
-                  <option value="SECONDARY">Secondary</option>
-                  <option value="TERTIARY">Tertiary</option>
-                  <option value="POLICE">Police</option>
-                  <option value="HOSPITAL">Hospital</option>
-                </select>
-              </div>
-
-              <div className="form-checkboxes">
                 <label className="checkbox">
                   <input
                     type="checkbox"
-                    name="canReceiveSms"
-                    checked={formData.canReceiveSms}
+                    name="isPrimary"
+                    checked={formData.isPrimary}
                     onChange={handleInputChange}
                   />
-                  Can receive SMS
-                </label>
-                <label className="checkbox">
-                  <input
-                    type="checkbox"
-                    name="canReceiveEmail"
-                    checked={formData.canReceiveEmail}
-                    onChange={handleInputChange}
-                  />
-                  Can receive Email
+                  Set as Primary Contact
                 </label>
               </div>
 
@@ -238,7 +183,7 @@ export const EmergencyContactManager = () => {
                   Cancel
                 </button>
                 <button type="submit" className="btn-save">
-                  {editingId ? 'Update' : 'Add'} Contact
+                  {editingId ? 'Update Contact' : 'Add Contact'}
                 </button>
               </div>
             </form>
@@ -250,7 +195,7 @@ export const EmergencyContactManager = () => {
         <div className="loading">Loading contacts...</div>
       ) : contacts.length === 0 ? (
         <div className="empty-state">
-          <p>No emergency contacts yet. Add one to get started.</p>
+          <p>No emergency contacts added yet.</p>
         </div>
       ) : (
         <div className="contacts-list">
@@ -266,41 +211,14 @@ export const EmergencyContactManager = () => {
               </div>
 
               <div className="contact-meta">
-                <div className="priority">{getPriorityBadge(contact.priority)}</div>
-                {contact.confirmed && (
-                  <span className="confirmed" title="Confirmed">✓</span>
+                {contact.isPrimary && (
+                  <span className="primary-badge">⭐ Primary</span>
                 )}
               </div>
 
               <div className="contact-actions">
-                <button
-                  className="btn-action btn-test-sms"
-                  onClick={() => handleTestNotification(contact.id, 'SMS')}
-                  title="Send test SMS"
-                >
-                  📨
-                </button>
-                <button
-                  className="btn-action btn-test-email"
-                  onClick={() => handleTestNotification(contact.id, 'EMAIL')}
-                  title="Send test Email"
-                >
-                  ✉️
-                </button>
-                <button
-                  className="btn-action btn-edit"
-                  onClick={() => handleEdit(contact)}
-                  title="Edit"
-                >
-                  ✏️
-                </button>
-                <button
-                  className="btn-action btn-delete"
-                  onClick={() => handleDelete(contact.id)}
-                  title="Delete"
-                >
-                  🗑️
-                </button>
+                <button className="btn-action btn-edit" onClick={() => handleEdit(contact)}>✏️</button>
+                <button className="btn-action btn-delete" onClick={() => handleDelete(contact.id)}>🗑️</button>
               </div>
             </div>
           ))}

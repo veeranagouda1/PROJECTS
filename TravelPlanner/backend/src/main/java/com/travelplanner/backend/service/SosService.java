@@ -25,6 +25,13 @@ public class SosService {
     @Autowired
     private EmergencyContactRepository emergencyContactRepository;
 
+    @Autowired
+    private EmailService emailService;
+
+    @Autowired
+    private SmsService smsService;
+
+
     public SosEvent createSosEvent(SosEvent sosEvent, Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
@@ -107,11 +114,28 @@ public class SosService {
                 .collect(Collectors.toList());
     }
 
+    
     private void notifyEmergencyContacts(User user, SosEvent sosEvent) {
-        List<EmergencyContact> contacts = emergencyContactRepository.findByUserOrderByIsPrimaryDesc(user);
-        // In production, this would send SMS/Email notifications
-        // For now, we'll just log it
-        System.out.println("Notifying emergency contacts for user: " + user.getEmail());
+        List<EmergencyContact> contacts =
+                emergencyContactRepository.findByUserOrderByIsPrimaryDesc(user);
+    
+        if (contacts.isEmpty()) return;
+    
+        // EMAIL NOTIFICATION
+        emailService.sendSosNotification(user, sosEvent, contacts);
+    
+        // SMS NOTIFICATION
+        String smsBody = "🚨 SOS ALERT 🚨\n" +
+                "User: " + user.getFullName() + "\n" +
+                "Phone: " + (user.getPhoneNumber() == null ? "Not provided" : user.getPhoneNumber()) + "\n" +
+                "Location: https://maps.google.com/?q=" + sosEvent.getLatitude() + "," + sosEvent.getLongitude();
+    
+        for (EmergencyContact contact : contacts) {
+            if (contact.getPhone() != null && !contact.getPhone().isEmpty()) {
+                smsService.sendSms(contact.getPhone(), smsBody);
+            }
+        }
     }
+    
 }
 

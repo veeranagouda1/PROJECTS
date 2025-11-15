@@ -43,7 +43,7 @@ const Planner = () => {
 
   const fetchTrips = async () => {
     try {
-      const response = await api.get('/trip/user');
+      const response = await api.get('/trips/user');
       setTrips(response.data);
     } catch (error) {
       showToast('Failed to fetch trips', 'error');
@@ -78,10 +78,10 @@ const Planner = () => {
       };
 
       if (editingTrip) {
-        await api.put(`/trip/${editingTrip.id}`, payload);
+        await api.put(`/trips/${editingTrip.id}`, payload);
         showToast('Trip updated successfully');
       } else {
-        await api.post('/trip', payload);
+        await api.post('/trips', payload);
         showToast('Trip created successfully');
       }
 
@@ -112,7 +112,7 @@ const Planner = () => {
     if (!window.confirm('Are you sure you want to delete this trip?')) return;
 
     try {
-      await api.delete(`/trip/${id}`);
+      await api.delete(`/trips/${id}`);
       showToast('Trip deleted successfully');
       fetchTrips();
     } catch (error) {

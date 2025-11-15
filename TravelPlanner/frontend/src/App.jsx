@@ -1,4 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
@@ -11,105 +12,142 @@ import PoliceDashboard from './pages/PoliceDashboard';
 import SOSLog from './pages/SOSLog';
 import GeofenceMap from './pages/GeofenceMap';
 import Articles from './pages/Articles';
+import EmergencyContactManager from './components/EmergencyContactManager';
 
-const PrivateRoute = ({ children }) => {
+// ⭐ ROLE BASED PRIVATE ROUTE
+const PrivateRoute = ({ children, allowedRoles }) => {
   const token = localStorage.getItem('token');
-  return token ? children : <Navigate to="/login" />;
+  const role = localStorage.getItem('role'); // saved after login
+
+  if (!token) return <Navigate to="/login" />;
+
+  if (allowedRoles && !allowedRoles.includes(role)) {
+    if (role === 'POLICE') return <Navigate to="/police-dashboard" />;
+    if (role === 'ADMIN') return <Navigate to="/admin" />;
+    return <Navigate to="/dashboard" />;
+  }
+
+  return children;
 };
 
 function App() {
   return (
     <Router>
-      <div className="App">
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          <Route
-            path="/dashboard"
-            element={
-              <PrivateRoute>
-                <Dashboard />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/planner"
-            element={
-              <PrivateRoute>
-                <Planner />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/budget"
-            element={
-              <PrivateRoute>
-                <BudgetPlanner />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/chatbot"
-            element={
-              <PrivateRoute>
-                <Chatbot />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/profile"
-            element={
-              <PrivateRoute>
-                <Profile />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/admin"
-            element={
-              <PrivateRoute>
-                <AdminDashboard />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/police"
-            element={
-              <PrivateRoute>
-                <PoliceDashboard />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/sos-log"
-            element={
-              <PrivateRoute>
-                <SOSLog />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/geofence"
-            element={
-              <PrivateRoute>
-                <GeofenceMap />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/articles"
-            element={
-              <PrivateRoute>
-                <Articles />
-              </PrivateRoute>
-            }
-          />
-          <Route path="/" element={<Navigate to="/dashboard" />} />
-        </Routes>
-      </div>
+      <Routes>
+
+        {/* ==== PUBLIC ==== */}
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+
+        {/* ==== TRAVELER ==== */}
+        <Route
+          path="/dashboard"
+          element={
+            <PrivateRoute allowedRoles={['TRAVELER', 'ADMIN']}>
+              <Dashboard />
+            </PrivateRoute>
+          }
+        />
+
+        <Route
+          path="/planner"
+          element={
+            <PrivateRoute allowedRoles={['TRAVELER']}>
+              <Planner />
+            </PrivateRoute>
+          }
+        />
+
+        <Route
+          path="/budget"
+          element={
+            <PrivateRoute allowedRoles={['TRAVELER']}>
+              <BudgetPlanner />
+            </PrivateRoute>
+          }
+        />
+
+        <Route
+          path="/chatbot"
+          element={
+            <PrivateRoute allowedRoles={['TRAVELER']}>
+              <Chatbot />
+            </PrivateRoute>
+          }
+        />
+
+        <Route
+          path="/profile"
+          element={
+            <PrivateRoute allowedRoles={['TRAVELER']}>
+              <Profile />
+            </PrivateRoute>
+          }
+        />
+
+        <Route
+          path="/emergency-contacts"
+          element={
+            <PrivateRoute allowedRoles={['TRAVELER']}>
+              <EmergencyContactManager />
+            </PrivateRoute>
+          }
+        />
+
+        {/* ==== POLICE ==== */}
+        <Route
+          path="/police-dashboard"
+          element={
+            <PrivateRoute allowedRoles={['POLICE']}>
+              <PoliceDashboard />
+            </PrivateRoute>
+          }
+        />
+
+        {/* ==== ADMIN ==== */}
+        <Route
+          path="/admin"
+          element={
+            <PrivateRoute allowedRoles={['ADMIN']}>
+              <AdminDashboard />
+            </PrivateRoute>
+          }
+        />
+
+        <Route
+          path="/geofence"
+          element={
+            <PrivateRoute allowedRoles={['ADMIN']}>
+              <GeofenceMap />
+            </PrivateRoute>
+          }
+        />
+
+        {/* ==== SHARED ==== */}
+        <Route
+          path="/sos-log"
+          element={
+            <PrivateRoute allowedRoles={['POLICE', 'ADMIN']}>
+              <SOSLog />
+            </PrivateRoute>
+          }
+        />
+
+        <Route
+          path="/articles"
+          element={
+            <PrivateRoute allowedRoles={['TRAVELER', 'ADMIN']}>
+              <Articles />
+            </PrivateRoute>
+          }
+        />
+
+        {/* DEFAULT */}
+        <Route path="/" element={<Navigate to="/dashboard" />} />
+
+      </Routes>
     </Router>
   );
 }
 
 export default App;
-

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../api/axios';
 import Navbar from '../components/Navbar';
-import SOSButton from '../components/SOSButton';
+import SOSButtonEnhanced from '../components/SOSButtonEnhanced';
 import Toast from '../components/Toast';
 
 const Dashboard = () => {
@@ -19,7 +19,7 @@ const Dashboard = () => {
   const fetchData = async () => {
     try {
       const [tripsRes, budgetsRes, sosRes] = await Promise.all([
-        api.get('/trip/user'),
+        api.get('/trips/user'),
         api.get('/budget/user'),
         api.get('/sos/user'),
       ]);
@@ -324,7 +324,7 @@ const Dashboard = () => {
 
         <div style={{ background: 'white', borderRadius: '12px', padding: '30px', boxShadow: '0 4px 15px rgba(0, 0, 0, 0.08)' }}>
           <h2 style={{ color: '#000000', marginTop: '0' }}>🆘 Emergency SOS</h2>
-          <SOSButton onSuccess={(msg, type) => showToast(msg, type)} />
+          <SOSButtonEnhanced onSuccess={(msg, type) => showToast(msg, type)} />
         </div>
       </div>
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}

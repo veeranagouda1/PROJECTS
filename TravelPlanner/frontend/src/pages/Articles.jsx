@@ -25,9 +25,13 @@ const Articles = () => {
 
   const fetchArticles = async () => {
     try {
-      const response = await api.get('/articles');
-      setArticles(response.data);
-      setFilteredArticles(response.data);
+      setLoading(true);
+      const response = await api.get('/articles/online', {
+        params: { page: 0, size: 50 }
+      });
+      const articlesData = response.data.articles || response.data || [];
+      setArticles(articlesData);
+      setFilteredArticles(articlesData);
     } catch (error) {
       console.error('Failed to fetch articles:', error);
       showToast('Failed to fetch articles', 'error');
@@ -47,7 +51,21 @@ const Articles = () => {
     return (
       <div>
         <Navbar />
-        <div className="loading-container">Loading articles...</div>
+        <div className="articles-container" style={{ padding: '40px' }}>
+          <div className="articles-header">
+            <h1>📰 Travel Articles & Safety News</h1>
+          </div>
+          <div className="articles-grid">
+            {[1, 2, 3, 4, 5, 6].map(i => (
+              <div key={i} className="article-card shimmer" style={{
+                height: '400px',
+                background: 'linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%)',
+                backgroundSize: '200% 100%',
+                animation: 'shimmer 1.5s infinite',
+              }}></div>
+            ))}
+          </div>
+        </div>
       </div>
     );
   }
@@ -96,10 +114,38 @@ const Articles = () => {
                     {article.source && <span className="article-source">{article.source}</span>}
                   </div>
                   <div className="article-text">
-                    {article.content.length > 200
+                    {article.content && article.content.length > 200
                       ? `${article.content.substring(0, 200)}...`
-                      : article.content}
+                      : article.content || article.summary}
                   </div>
+                  {article.source && (
+                    <a
+                      href={article.source.startsWith('http') ? article.source : '#'}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        display: 'inline-block',
+                        marginTop: '15px',
+                        padding: '8px 16px',
+                        backgroundColor: '#6A5AE0',
+                        color: 'white',
+                        textDecoration: 'none',
+                        borderRadius: '6px',
+                        fontWeight: '500',
+                        transition: 'all 0.3s ease',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.target.style.backgroundColor = '#8A63FF';
+                        e.target.style.transform = 'translateY(-2px)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.target.style.backgroundColor = '#6A5AE0';
+                        e.target.style.transform = 'translateY(0)';
+                      }}
+                    >
+                      Read More →
+                    </a>
+                  )}
                 </div>
               </div>
             ))

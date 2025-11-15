@@ -14,7 +14,7 @@ import com.travelplanner.backend.service.EmergencyContactService;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/contacts")
+@RequestMapping("/api/emergency")
 @CrossOrigin(origins = "*")
 public class EmergencyContactController {
     @Autowired

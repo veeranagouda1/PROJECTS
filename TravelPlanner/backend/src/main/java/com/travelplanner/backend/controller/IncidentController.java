@@ -78,5 +78,13 @@ public class IncidentController {
     public ResponseEntity<List<Map<String, Object>>> getLiveIncidents() {
         return ResponseEntity.ok(incidentService.getLiveIncidentsForHeatmap());
     }
+
+    @GetMapping("/safety-report")
+    public ResponseEntity<Map<String, Object>> getSafetyReport(
+            @RequestParam Double latitude,
+            @RequestParam Double longitude,
+            @RequestParam(defaultValue = "5000") Double radius) {
+        return ResponseEntity.ok(incidentService.getSafetyReport(latitude, longitude, radius));
+    }
 }
 

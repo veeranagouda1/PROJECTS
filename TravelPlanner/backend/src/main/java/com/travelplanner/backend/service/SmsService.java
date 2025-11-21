@@ -1,33 +1,38 @@
 package com.travelplanner.backend.service;
 
+import com.twilio.Twilio;
+import com.twilio.rest.api.v2010.account.Message;
+import com.twilio.type.PhoneNumber;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
 
 @Service
 public class SmsService {
 
-    @Value("${fast2sms.api.key}")
-    private String apiKey;
+    @Value("${twilio.account-sid}")
+    private String accountSid;
+
+    @Value("${twilio.auth-token}")
+    private String authToken;
+
+    @Value("${twilio.phone-number}")
+    private String twilioPhoneNumber;
 
     public void sendSms(String phoneNumber, String message) {
         try {
-            RestTemplate rest = new RestTemplate();
+            Twilio.init(accountSid, authToken);
+            
+            Message response = Message.creator(
+                    new PhoneNumber(phoneNumber),
+                    new PhoneNumber(twilioPhoneNumber),
+                    message
+            ).create();
 
-            String url =
-                    "https://www.fast2sms.com/dev/bulk?" +
-                    "authorization=" + apiKey +
-                    "&sender_id=TXTIND" +
-                    "&message=" + message.replace(" ", "%20") +
-                    "&language=english" +
-                    "&route=q" +
-                    "&numbers=" + phoneNumber;
-
-            String response = rest.getForObject(url, String.class);
-            System.out.println("SMS SENT RESPONSE: " + response);
+            System.out.println("✅ SMS SENT via Twilio - SID: " + response.getSid());
 
         } catch (Exception e) {
-            System.err.println("❌ SMS FAILED: " + e.getMessage());
+            System.err.println("❌ SMS FAILED via Twilio: " + e.getMessage());
+            e.printStackTrace();
         }
     }
 }

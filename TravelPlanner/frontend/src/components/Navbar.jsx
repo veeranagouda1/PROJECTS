@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import api from '../api/axios';
 import Notifications from './Notifications';
 import { useTheme } from '../contexts/ThemeContext';
+import { safeStorage, storageKeys } from '../utils/storage';
 
 const Navbar = () => {
   const navigate = useNavigate();
@@ -22,28 +23,31 @@ const Navbar = () => {
   }, []);
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
+    safeStorage.removeItem(storageKeys.TOKEN);
+    safeStorage.removeItem(storageKeys.ROLE);
+    safeStorage.removeItem(storageKeys.USER_ID);
+    safeStorage.removeItem(storageKeys.USER_EMAIL);
     navigate('/login');
   };
 
   const menuItemStyle = {
-    color: 'white',
+    color: '#F5F7FF',
     textDecoration: 'none',
     fontWeight: '500',
     transition: 'all 0.3s ease',
-    opacity: 0.9,
+    opacity: 0.85,
     padding: '6px 10px',
     borderRadius: '6px',
   };
 
   const menuHover = (e) => {
     e.target.style.opacity = '1';
-    e.target.style.textShadow = '0 2px 8px rgba(0,0,0,0.2)';
-    e.target.style.backgroundColor = 'rgba(255,255,255,0.2)';
+    e.target.style.textShadow = '0 0 10px rgba(123, 47, 255, 0.6)';
+    e.target.style.backgroundColor = 'rgba(123, 47, 255, 0.2)';
   };
 
   const menuOut = (e) => {
-    e.target.style.opacity = '0.9';
+    e.target.style.opacity = '0.85';
     e.target.style.textShadow = 'none';
     e.target.style.backgroundColor = 'transparent';
   };
@@ -51,23 +55,17 @@ const Navbar = () => {
   return (
     <nav
       style={{
-        background: isDark
-          ? 'rgba(10, 10, 25, 0.7)'
-          : 'linear-gradient(135deg, #4C2AFF 0%, #8B5DFF 100%)',
+        background: 'linear-gradient(135deg, rgba(123, 47, 255, 0.15) 0%, rgba(0, 210, 255, 0.1) 100%)',
         padding: '15px 30px',
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
         flexWrap: 'wrap',
         marginBottom: '30px',
-        boxShadow: isDark
-          ? '0 4px 20px rgba(0,0,0,0.5)'
-          : '0 4px 20px rgba(76, 42, 255, 0.3)',
+        boxShadow: '0 0 30px rgba(123, 47, 255, 0.4), 0 4px 20px rgba(0, 0, 0, 0.6)',
         backdropFilter: 'blur(12px)',
         WebkitBackdropFilter: 'blur(12px)',
-        borderBottom: isDark
-          ? '1px solid rgba(255,255,255,0.05)'
-          : '1px solid rgba(255, 255, 255, 0.2)',
+        borderBottom: '2px solid rgba(123, 47, 255, 0.3)',
         borderRadius: '0 0 15px 15px',
         transition: '0.3s ease-in-out',
       }}
@@ -107,12 +105,12 @@ const Navbar = () => {
           Chatbot
         </Link>
 
-        <Link to="/geofence" style={menuItemStyle} onMouseEnter={menuHover} onMouseLeave={menuOut}>
-          Safety Map
+        <Link to="/safety-map" style={menuItemStyle} onMouseEnter={menuHover} onMouseLeave={menuOut}>
+          🗺️ Safety Map
         </Link>
 
         <Link to="/articles" style={menuItemStyle} onMouseEnter={menuHover} onMouseLeave={menuOut}>
-          Articles
+          📰 Articles
         </Link>
 
         {/* ⭐ NEW — EMERGENCY CONTACTS */}
@@ -128,7 +126,7 @@ const Navbar = () => {
         {/* POLICE ROLE */}
         {user?.role === 'POLICE' && (
           <Link
-            to="/police"
+            to="/police-dashboard"
             style={menuItemStyle}
             onMouseEnter={menuHover}
             onMouseLeave={menuOut}
@@ -156,8 +154,8 @@ const Navbar = () => {
         <button
           onClick={toggleTheme}
           style={{
-            background: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(255, 255, 255, 0.25)',
-            border: 'none',
+            background: 'rgba(123, 47, 255, 0.2)',
+            border: '1px solid rgba(123, 47, 255, 0.4)',
             borderRadius: '50%',
             width: '42px',
             height: '42px',
@@ -167,10 +165,17 @@ const Navbar = () => {
             cursor: 'pointer',
             fontSize: '20px',
             transition: 'all 0.3s ease',
-            color: 'white',
+            color: '#F5F7FF',
+            boxShadow: '0 0 15px rgba(123, 47, 255, 0.2)',
           }}
-          onMouseEnter={(e) => (e.target.style.transform = 'scale(1.1)')}
-          onMouseLeave={(e) => (e.target.style.transform = 'scale(1)')}
+          onMouseEnter={(e) => {
+            e.target.style.transform = 'scale(1.1)';
+            e.target.style.boxShadow = '0 0 25px rgba(123, 47, 255, 0.4)';
+          }}
+          onMouseLeave={(e) => {
+            e.target.style.transform = 'scale(1)';
+            e.target.style.boxShadow = '0 0 15px rgba(123, 47, 255, 0.2)';
+          }}
           title={isDark ? 'Light Mode' : 'Dark Mode'}
         >
           {isDark ? '☀️' : '🌙'}
@@ -184,7 +189,8 @@ const Navbar = () => {
             ...menuItemStyle,
             padding: '8px 15px',
             borderRadius: '8px',
-            backgroundColor: 'rgba(255,255,255,0.15)',
+            backgroundColor: 'rgba(123, 47, 255, 0.15)',
+            border: '1px solid rgba(123, 47, 255, 0.2)',
           }}
           onMouseEnter={menuHover}
           onMouseLeave={menuOut}
@@ -195,23 +201,23 @@ const Navbar = () => {
         <button
           onClick={handleLogout}
           style={{
-            background: 'linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%)',
-            color: 'white',
+            background: 'linear-gradient(135deg, #FF4E88 0%, #FF6F61 100%)',
+            color: '#F5F7FF',
             border: 'none',
             padding: '10px 20px',
             borderRadius: '8px',
             cursor: 'pointer',
             fontWeight: '600',
-            boxShadow: '0 4px 12px rgba(255, 107, 107, 0.3)',
+            boxShadow: '0 0 15px rgba(255, 78, 136, 0.4), 0 4px 12px rgba(0, 0, 0, 0.3)',
             transition: 'all 0.3s ease',
           }}
           onMouseEnter={(e) => {
             e.target.style.transform = 'translateY(-2px)';
-            e.target.style.boxShadow = '0 6px 18px rgba(255, 107, 107, 0.4)';
+            e.target.style.boxShadow = '0 0 25px rgba(255, 78, 136, 0.6), 0 6px 18px rgba(0, 0, 0, 0.4)';
           }}
           onMouseLeave={(e) => {
             e.target.style.transform = 'translateY(0)';
-            e.target.style.boxShadow = '0 4px 12px rgba(255, 107, 107, 0.3)';
+            e.target.style.boxShadow = '0 0 15px rgba(255, 78, 136, 0.4), 0 4px 12px rgba(0, 0, 0, 0.3)';
           }}
         >
           Logout

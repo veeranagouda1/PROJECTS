@@ -125,14 +125,19 @@ public class SosService {
         emailService.sendSosNotification(user, sosEvent, contacts);
     
         // SMS NOTIFICATION
-        String smsBody = "🚨 SOS ALERT 🚨\n" +
-                "User: " + user.getFullName() + "\n" +
+        String smsBody = "SOS ALERT - URGENT\n" +
+                "Name: " + user.getFullName() + "\n" +
                 "Phone: " + (user.getPhoneNumber() == null ? "Not provided" : user.getPhoneNumber()) + "\n" +
-                "Location: https://maps.google.com/?q=" + sosEvent.getLatitude() + "," + sosEvent.getLongitude();
+                "Location: https://maps.google.com/?q=" + sosEvent.getLatitude() + "," + sosEvent.getLongitude() + "\n" +
+                "Time: " + sosEvent.getTimestamp();
     
         for (EmergencyContact contact : contacts) {
             if (contact.getPhone() != null && !contact.getPhone().isEmpty()) {
-                smsService.sendSms(contact.getPhone(), smsBody);
+                try {
+                    smsService.sendSms(contact.getPhone(), smsBody);
+                } catch (Exception e) {
+                    System.err.println("Failed to send SMS to " + contact.getPhone() + ": " + e.getMessage());
+                }
             }
         }
     }

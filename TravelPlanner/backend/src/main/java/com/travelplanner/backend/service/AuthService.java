@@ -67,5 +67,23 @@ public class AuthService {
             throw new RuntimeException("Invalid email or password");
         }
     }
+
+    public AuthResponse loginOrRegisterWithOAuth2(String email, String fullName) {
+        User user = userRepository.findByEmail(email).orElse(null);
+        
+        if (user == null) {
+            user = new User();
+            user.setEmail(email);
+            user.setFullName(fullName != null ? fullName : email.split("@")[0]);
+            user.setPassword(passwordEncoder.encode(System.currentTimeMillis() + "_oauth2"));
+            user.setRole(User.Role.TRAVELER);
+            user.setCreatedAt(LocalDateTime.now());
+            user.setUpdatedAt(LocalDateTime.now());
+            user = userRepository.save(user);
+        }
+        
+        String token = tokenProvider.generateToken(user.getEmail());
+        return new AuthResponse(token, user.getEmail(), user.getFullName(), user.getRole().name(), user.getId());
+    }
 }
 

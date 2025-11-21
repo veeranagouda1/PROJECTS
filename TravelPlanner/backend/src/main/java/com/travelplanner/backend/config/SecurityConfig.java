@@ -1,5 +1,6 @@
 package com.travelplanner.backend.config;
 
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -20,6 +21,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import com.travelplanner.backend.security.CustomUserDetailsService;
 import com.travelplanner.backend.security.JwtAuthenticationFilter;
+import com.travelplanner.backend.security.OAuth2SuccessHandler;
 
 import java.util.Arrays;
 import java.util.List;
@@ -34,6 +36,12 @@ public class SecurityConfig {
 
     @Autowired
     private JwtAuthenticationFilter jwtAuthenticationFilter;
+
+    private final ObjectProvider<OAuth2SuccessHandler> oAuth2SuccessHandlerProvider;
+
+    public SecurityConfig(ObjectProvider<OAuth2SuccessHandler> oAuth2SuccessHandlerProvider) {
+        this.oAuth2SuccessHandlerProvider = oAuth2SuccessHandlerProvider;
+    }
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -55,6 +63,8 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+        OAuth2SuccessHandler handler = oAuth2SuccessHandlerProvider.getIfAvailable();
+        
         http
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .csrf(csrf -> csrf.disable())
@@ -67,6 +77,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/articles/public/**").permitAll()
                 .requestMatchers("/error").permitAll()
                 .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
+                .requestMatchers("/oauth2/**", "/login/oauth2/**").permitAll()
 
                 // ---------- USER + POLICE + ADMIN ----------
                 .requestMatchers("/api/trips/**").hasAnyRole("TRAVELER", "POLICE", "ADMIN")
@@ -80,9 +91,13 @@ public class SecurityConfig {
 
                 // Everything else → must be authenticated
                 .anyRequest().authenticated()
-            )
+            );
 
-            .authenticationProvider(authenticationProvider())
+        if (handler != null) {
+            http.oauth2Login(oauth2 -> oauth2.successHandler(handler));
+        }
+
+        http.authenticationProvider(authenticationProvider())
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();

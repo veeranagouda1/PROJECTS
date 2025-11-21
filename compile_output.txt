@@ -1,0 +1,5 @@
+Current directory: c:\Users\ACER\Travel-Planner 1\TravelPlanner\backend
+Maven path: 
+INFO: Could not find files for the given pattern(s).
+Running mvn...
+Done. Exit code: 9009

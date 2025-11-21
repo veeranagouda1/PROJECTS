@@ -1,7 +1,9 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { safeStorage, storageKeys } from './utils/storage';
 
 import Login from './pages/Login';
 import Register from './pages/Register';
+import OAuthCallback from './pages/OAuthCallback';
 import Dashboard from './pages/Dashboard';
 import Planner from './pages/Planner';
 import BudgetPlanner from './pages/BudgetPlanner';
@@ -12,14 +14,17 @@ import PoliceDashboard from './pages/PoliceDashboard';
 import SOSLog from './pages/SOSLog';
 import GeofenceMap from './pages/GeofenceMap';
 import Articles from './pages/Articles';
+import SafetyMap from './pages/SafetyMap';
 import EmergencyContactManager from './components/EmergencyContactManager';
 
 // ⭐ ROLE BASED PRIVATE ROUTE
 const PrivateRoute = ({ children, allowedRoles }) => {
-  const token = localStorage.getItem('token');
-  const role = localStorage.getItem('role'); // saved after login
+  const token = safeStorage.getItem(storageKeys.TOKEN);
+  const role = safeStorage.getItem(storageKeys.ROLE);
 
   if (!token) return <Navigate to="/login" />;
+
+  if (!role) return <Navigate to="/login" />;
 
   if (allowedRoles && !allowedRoles.includes(role)) {
     if (role === 'POLICE') return <Navigate to="/police-dashboard" />;
@@ -38,6 +43,7 @@ function App() {
         {/* ==== PUBLIC ==== */}
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/oauth-callback" element={<OAuthCallback />} />
 
         {/* ==== TRAVELER ==== */}
         <Route
@@ -138,6 +144,15 @@ function App() {
           element={
             <PrivateRoute allowedRoles={['TRAVELER', 'ADMIN']}>
               <Articles />
+            </PrivateRoute>
+          }
+        />
+
+        <Route
+          path="/safety-map"
+          element={
+            <PrivateRoute allowedRoles={['TRAVELER', 'ADMIN']}>
+              <SafetyMap />
             </PrivateRoute>
           }
         />

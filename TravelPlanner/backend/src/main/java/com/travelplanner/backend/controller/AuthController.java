@@ -3,6 +3,7 @@ package com.travelplanner.backend.controller;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.web.bind.annotation.*;
 
 import com.travelplanner.backend.dto.AuthResponse;
@@ -13,7 +14,7 @@ import com.travelplanner.backend.service.AuthService;
 
 @RestController
 @RequestMapping("/api/auth")
-@CrossOrigin(origins = "*")
+@CrossOrigin(origins = "*", maxAge = 3600, allowedHeaders = "*", methods = {org.springframework.web.bind.annotation.RequestMethod.GET, org.springframework.web.bind.annotation.RequestMethod.POST, org.springframework.web.bind.annotation.RequestMethod.OPTIONS})
 public class AuthController {
     @Autowired
     private AuthService authService;
@@ -21,17 +22,42 @@ public class AuthController {
     @PostMapping("/register")
     public ResponseEntity<?> register(@Valid @RequestBody RegisterRequest request) {
         try {
+            if (request.getEmail() == null || request.getEmail().trim().isEmpty()) {
+                return ResponseEntity.status(400)
+                        .body(new ErrorResponse("Email is required"));
+            }
+            if (request.getPassword() == null || request.getPassword().length() < 6) {
+                return ResponseEntity.status(400)
+                        .body(new ErrorResponse("Password must be at least 6 characters"));
+            }
+            if (request.getFullName() == null || request.getFullName().trim().isEmpty()) {
+                return ResponseEntity.status(400)
+                        .body(new ErrorResponse("Full name is required"));
+            }
+            
             AuthResponse response = authService.register(request);
             return ResponseEntity.ok(response);
         } catch (RuntimeException e) {
             return ResponseEntity.status(400)
                     .body(new ErrorResponse(e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(400)
+                    .body(new ErrorResponse("Registration failed: " + e.getMessage()));
         }
     }
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@Valid @RequestBody LoginRequest request) {
         try {
+            if (request.getEmail() == null || request.getEmail().trim().isEmpty()) {
+                return ResponseEntity.status(400)
+                        .body(new ErrorResponse("Email is required"));
+            }
+            if (request.getPassword() == null || request.getPassword().trim().isEmpty()) {
+                return ResponseEntity.status(400)
+                        .body(new ErrorResponse("Password is required"));
+            }
+            
             AuthResponse response = authService.login(request);
             return ResponseEntity.ok(response);
         } catch (RuntimeException e) {
@@ -40,6 +66,30 @@ public class AuthController {
         } catch (Exception e) {
             return ResponseEntity.status(401)
                     .body(new ErrorResponse("Authentication failed"));
+        }
+    }
+
+    @GetMapping("/oauth2/callback")
+    public ResponseEntity<?> oauth2Callback(OAuth2AuthenticationToken authentication) {
+        try {
+            if (authentication == null || authentication.getPrincipal() == null) {
+                return ResponseEntity.status(401)
+                        .body(new ErrorResponse("OAuth2 authentication failed"));
+            }
+            
+            String email = (String) authentication.getPrincipal().getAttributes().get("email");
+            String name = (String) authentication.getPrincipal().getAttributes().get("name");
+            
+            if (email == null || email.isEmpty()) {
+                return ResponseEntity.status(400)
+                        .body(new ErrorResponse("Email not provided by OAuth2 provider"));
+            }
+            
+            AuthResponse response = authService.loginOrRegisterWithOAuth2(email, name);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.status(401)
+                    .body(new ErrorResponse("OAuth2 authentication failed: " + e.getMessage()));
         }
     }
 }

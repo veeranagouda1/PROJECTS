@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react';
+import { safeStorage, storageKeys } from '../utils/storage';
 
 const ThemeContext = createContext();
 
@@ -12,12 +13,12 @@ export const useTheme = () => {
 
 export const ThemeProvider = ({ children }) => {
   const [isDark, setIsDark] = useState(() => {
-    const saved = localStorage.getItem('theme');
+    const saved = safeStorage.getItem(storageKeys.THEME);
     return saved ? saved === 'dark' : false;
   });
 
   useEffect(() => {
-    localStorage.setItem('theme', isDark ? 'dark' : 'light');
+    safeStorage.setItem(storageKeys.THEME, isDark ? 'dark' : 'light');
     document.documentElement.classList.toggle('dark', isDark);
   }, [isDark]);
 

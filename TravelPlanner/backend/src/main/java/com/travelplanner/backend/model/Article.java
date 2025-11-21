@@ -29,6 +29,7 @@ public class Article {
     private String imageUrl;
     private String source;
     private String category; // SAFETY, TRAVEL_TIPS, NEWS, HISTORY
+    private String location; // State or region associated with the article
 
     @Column(nullable = false)
     private LocalDateTime publishedAt = LocalDateTime.now();

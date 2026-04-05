@@ -1,33 +1,40 @@
 /**
- * Decode a JWT payload without verifying signature.
- * Verification happens on the backend (gateway) — this is just for UI decisions.
+ * Decodes JWT payload without verifying signature.
+ * Gateway does the real verification.
+ *
+ * Your JwtService puts:
+ *   .setSubject(email)       → payload.sub
+ *   .claim("role", role)     → payload.role  ("USER" or "ADMIN")
+ *   .claim("type", "ACCESS") → payload.type
  */
 export function decodeJwt(token) {
     try {
-        const base64Payload = token.split(".")[1];
-        const decoded = atob(base64Payload.replace(/-/g, "+").replace(/_/g, "/"));
-        return JSON.parse(decoded);
+        const base64 = token.split(".")[1]
+            .replace(/-/g, "+")
+            .replace(/_/g, "/");
+        return JSON.parse(atob(base64));
     } catch {
         return null;
     }
 }
 
 /**
- * Extract user info from access token.
- * Spring's JWT uses "sub" for email, and we store role as a claim.
+ * Returns { email, role } from access token.
+ * role will be "USER" or "ADMIN" — exactly as stored in UserRole enum.
  */
 export function getUserFromToken(token) {
     if (!token) return null;
     const payload = decodeJwt(token);
     if (!payload) return null;
+    // Only trust ACCESS tokens, not REFRESH tokens
+    if (payload.type !== "ACCESS") return null;
     return {
-        email: payload.sub || payload.email || "",
-        role: payload.role || payload.authorities?.[0] || "USER",
+        email: payload.sub,
+        role: payload.role, // "USER" or "ADMIN"
         exp: payload.exp,
     };
 }
 
-/** Returns true if token is expired */
 export function isTokenExpired(token) {
     const payload = decodeJwt(token);
     if (!payload?.exp) return true;

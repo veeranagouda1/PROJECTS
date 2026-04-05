@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import {
@@ -8,25 +8,21 @@ import {
     clearError,
 } from "../features/auth/authSlice";
 
-// ─── Google Client ID — must match your backend ───────────
 const GOOGLE_CLIENT_ID =
     "769453934960-76o89h3pd85e3kbk2fbie898s5sna7og.apps.googleusercontent.com";
 
-// ─── Load Google Identity Services script once ────────────
-let googleScriptLoaded = false;
-function loadGoogleScript() {
-    if (googleScriptLoaded || document.getElementById("google-gsi")) return;
-    const script = document.createElement("script");
-    script.src = "https://accounts.google.com/gsi/client";
-    script.id = "google-gsi";
-    script.async = true;
-    script.defer = true;
-    document.head.appendChild(script);
-    googleScriptLoaded = true;
+let gsiLoaded = false;
+function loadGsi() {
+    if (gsiLoaded || document.getElementById("gsi-script")) return;
+    const s = document.createElement("script");
+    s.id = "gsi-script";
+    s.src = "https://accounts.google.com/gsi/client";
+    s.async = true;
+    document.head.appendChild(s);
+    gsiLoaded = true;
 }
 
-// ─── Styles ───────────────────────────────────────────────
-const s = {
+const S = {
     overlay: {
         position: "fixed", inset: 0,
         background: "rgba(0,0,0,0.4)",
@@ -37,16 +33,15 @@ const s = {
         background: "#fff", borderRadius: "20px",
         padding: "48px 52px", width: "440px",
         boxShadow: "0 32px 80px rgba(0,0,0,0.2)",
-        position: "relative", animation: "modalIn 0.2s ease",
+        position: "relative",
     },
     closeBtn: {
         position: "absolute", top: "18px", right: "22px",
-        background: "none", border: "none",
-        fontSize: "20px", color: "#bbb",
-        cursor: "pointer", fontFamily: "inherit",
-        width: "32px", height: "32px",
+        background: "none", border: "none", fontSize: "20px",
+        color: "#bbb", cursor: "pointer", fontFamily: "inherit",
+        width: "32px", height: "32px", borderRadius: "50%",
         display: "flex", alignItems: "center", justifyContent: "center",
-        borderRadius: "50%", transition: "background 0.15s",
+        transition: "background 0.15s",
     },
     tabs: {
         display: "flex", marginBottom: "32px",
@@ -65,7 +60,7 @@ const s = {
         fontSize: "24px", fontWeight: 700,
         color: "#111", marginBottom: "6px", letterSpacing: "-0.5px",
     },
-    sub: { fontSize: "14px", color: "#888", marginBottom: "28px", lineHeight: 1.5 },
+    sub: { fontSize: "14px", color: "#888", marginBottom: "28px" },
     googleBtn: {
         width: "100%", padding: "13px",
         border: "1.5px solid #e8e8e8", borderRadius: "12px",
@@ -73,7 +68,7 @@ const s = {
         cursor: "pointer", display: "flex",
         alignItems: "center", justifyContent: "center",
         gap: "10px", color: "#111", fontFamily: "inherit",
-        transition: "all 0.15s", marginBottom: "4px",
+        transition: "border-color 0.15s",
     },
     divider: {
         display: "flex", alignItems: "center",
@@ -81,8 +76,7 @@ const s = {
     },
     divLine: { flex: 1, height: "1px", background: "#f0f0f0" },
     divText: { fontSize: "12px", color: "#ccc", fontWeight: 500 },
-    inputWrap: { position: "relative", marginBottom: "12px" },
-    inputLabel: {
+    label: {
         display: "block", fontSize: "12px",
         fontWeight: 600, color: "#666",
         marginBottom: "6px", letterSpacing: "0.2px",
@@ -93,7 +87,7 @@ const s = {
         fontSize: "14px", outline: "none",
         boxSizing: "border-box", color: "#111",
         background: "#fff", fontFamily: "inherit",
-        transition: "border-color 0.15s",
+        marginBottom: "14px", transition: "border-color 0.15s",
     },
     submitBtn: (loading) => ({
         width: "100%", padding: "14px",
@@ -101,9 +95,8 @@ const s = {
         border: "none", borderRadius: "12px",
         fontSize: "15px", fontWeight: 700,
         cursor: loading ? "not-allowed" : "pointer",
-        marginTop: "8px", fontFamily: "inherit",
-        opacity: loading ? 0.75 : 1,
-        transition: "all 0.15s", letterSpacing: "-0.2px",
+        marginTop: "4px", fontFamily: "inherit",
+        opacity: loading ? 0.75 : 1, transition: "background 0.15s",
     }),
     error: {
         fontSize: "13px", color: "#c53030",
@@ -111,15 +104,15 @@ const s = {
         background: "#fff5f5", borderRadius: "10px",
         border: "1px solid #fed7d7", lineHeight: 1.5,
     },
-    success: {
-        fontSize: "13px", color: "#276749",
-        marginBottom: "16px", padding: "12px 16px",
-        background: "#f0fff4", borderRadius: "10px",
-        border: "1px solid #c6f6d5",
+    switchRow: {
+        textAlign: "center", fontSize: "13px",
+        color: "#aaa", marginTop: "20px",
+    },
+    switchLink: {
+        color: "#111", fontWeight: 600, cursor: "pointer",
     },
 };
 
-// ─── Google SVG icon ──────────────────────────────────────
 function GoogleIcon() {
     return (
         <svg width="18" height="18" viewBox="0 0 18 18">
@@ -131,13 +124,12 @@ function GoogleIcon() {
     );
 }
 
-// ─── Reusable input field ─────────────────────────────────
-function Field({ label, type, placeholder, value, onChange, onKeyDown }) {
+function Field({ label, type = "text", placeholder, value, onChange, onKeyDown }) {
     return (
-        <div style={s.inputWrap}>
-            <label style={s.inputLabel}>{label}</label>
+        <div>
+            <label style={S.label}>{label}</label>
             <input
-                style={s.input}
+                style={S.input}
                 type={type}
                 placeholder={placeholder}
                 value={value}
@@ -150,7 +142,6 @@ function Field({ label, type, placeholder, value, onChange, onKeyDown }) {
     );
 }
 
-// ─── Main modal ───────────────────────────────────────────
 export default function AuthModal({ show, onClose }) {
     const dispatch = useDispatch();
     const navigate = useNavigate();
@@ -162,23 +153,42 @@ export default function AuthModal({ show, onClose }) {
     const [password, setPassword] = useState("");
     const [googleLoading, setGoogleLoading] = useState(false);
 
-    // Load Google script on mount
-    useEffect(() => { loadGoogleScript(); }, []);
+    // ✅ ref for hidden Google button container
+    const googleBtnRef = useRef(null);
 
-    // Redirect on successful login
+    useEffect(() => { loadGsi(); }, []);
+
+    // ✅ Initialize Google once when modal opens
+    useEffect(() => {
+        if (!show) return;
+
+        const tryInit = () => {
+            if (!window.google?.accounts?.id) {
+                setTimeout(tryInit, 200); // wait for GSI script to load
+                return;
+            }
+            window.google.accounts.id.initialize({
+                client_id: GOOGLE_CLIENT_ID,
+                callback: (response) => {
+                    setGoogleLoading(false);
+                    if (response.credential) {
+                        dispatch(googleLoginUser(response.credential));
+                    }
+                },
+                ux_mode: "popup",
+            });
+        };
+
+        tryInit();
+    }, [show]); // re-init when modal opens
+
     useEffect(() => {
         if (accessToken && user && show) {
             onClose();
-            // Role-based redirect
-            if (user.role === "ADMIN") {
-                navigate("/admin");
-            } else {
-                navigate("/dashboard");
-            }
+            navigate(user.role === "ADMIN" ? "/admin" : "/dashboard");
         }
     }, [accessToken, user]);
 
-    // Reset form when tab changes
     useEffect(() => {
         dispatch(clearError());
         setName(""); setEmail(""); setPassword("");
@@ -186,7 +196,6 @@ export default function AuthModal({ show, onClose }) {
 
     if (!show) return null;
 
-    // ── Email/password submit ──
     const handleSubmit = () => {
         if (!email.trim() || !password.trim()) return;
         if (tab === "login") {
@@ -197,149 +206,103 @@ export default function AuthModal({ show, onClose }) {
         }
     };
 
-    // ── Google login using GSI ──
+    // ✅ Use renderButton + auto-click instead of prompt()
     const handleGoogle = () => {
-        if (!window.google) {
-            alert("Google sign-in is loading, please try again in a moment.");
+        if (!window.google?.accounts?.id) {
+            alert("Google sign-in is still loading, please try again.");
             return;
         }
+
         setGoogleLoading(true);
 
-        const client = window.google.accounts.oauth2.initTokenClient({
-            client_id: GOOGLE_CLIENT_ID,
-            scope: "openid email profile",
-            callback: () => { }, // not used — we use id_token flow below
-        });
+        if (googleBtnRef.current) {
+            googleBtnRef.current.innerHTML = ""; // clear previous render
+            window.google.accounts.id.renderButton(googleBtnRef.current, {
+                type: "standard",
+                size: "large",
+                theme: "outline",
+            });
 
-        // Use ID token flow instead
-        window.google.accounts.id.initialize({
-            client_id: GOOGLE_CLIENT_ID,
-            callback: async (response) => {
-                setGoogleLoading(false);
-                if (response.credential) {
-                    dispatch(googleLoginUser(response.credential));
+            // Auto-click the rendered Google button
+            setTimeout(() => {
+                const btn = googleBtnRef.current?.querySelector("div[role=button]");
+                if (btn) {
+                    btn.click();
+                } else {
+                    setGoogleLoading(false);
+                    alert("Could not open Google sign-in. Please try again.");
                 }
-            },
-            auto_select: false,
-        });
-
-        window.google.accounts.id.prompt((notification) => {
-            if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-                setGoogleLoading(false);
-                // Fallback: show one-tap or popup
-                window.google.accounts.id.renderButton(
-                    document.getElementById("g-btn-container"),
-                    { theme: "outline", size: "large", width: 340 }
-                );
-            }
-        });
+            }, 150);
+        }
     };
+
+    const onEnter = (e) => { if (e.key === "Enter") handleSubmit(); };
 
     return (
         <>
-            <style>{`
-        @keyframes modalIn {
-          from { opacity: 0; transform: translateY(12px) scale(0.97); }
-          to   { opacity: 1; transform: translateY(0) scale(1); }
-        }
-      `}</style>
+            <style>{`@keyframes mIn{from{opacity:0;transform:translateY(10px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}`}</style>
+            <div style={S.overlay} onClick={onClose}>
+                <div style={{ ...S.modal, animation: "mIn 0.2s ease" }} onClick={(e) => e.stopPropagation()}>
 
-            <div style={s.overlay} onClick={onClose}>
-                <div style={s.modal} onClick={(e) => e.stopPropagation()}>
-
-                    {/* Close */}
                     <button
-                        style={s.closeBtn}
+                        style={S.closeBtn}
                         onClick={onClose}
                         onMouseEnter={(e) => (e.currentTarget.style.background = "#f5f5f5")}
                         onMouseLeave={(e) => (e.currentTarget.style.background = "none")}
                     >×</button>
 
-                    {/* Tabs */}
-                    <div style={s.tabs}>
-                        <button style={s.tab(tab === "login")} onClick={() => setTab("login")}>Log in</button>
-                        <button style={s.tab(tab === "register")} onClick={() => setTab("register")}>Sign up</button>
+                    <div style={S.tabs}>
+                        <button style={S.tab(tab === "login")} onClick={() => setTab("login")}>Log in</button>
+                        <button style={S.tab(tab === "register")} onClick={() => setTab("register")}>Sign up</button>
                     </div>
 
-                    {/* Heading */}
-                    <h2 style={s.heading}>
-                        {tab === "login" ? "Welcome back" : "Create your account"}
-                    </h2>
-                    <p style={s.sub}>
-                        {tab === "login"
-                            ? "Sign in to continue to CollabX."
-                            : "Start collaborating with your team in seconds."}
-                    </p>
+                    <h2 style={S.heading}>{tab === "login" ? "Welcome back" : "Create your account"}</h2>
+                    <p style={S.sub}>{tab === "login" ? "Sign in to continue to CollabX." : "Start collaborating in seconds."}</p>
 
-                    {/* Google button */}
+                    {/* ✅ Your custom Google button */}
                     <button
-                        style={s.googleBtn}
+                        style={S.googleBtn}
                         onClick={handleGoogle}
                         disabled={googleLoading}
-                        onMouseEnter={(e) => (e.currentTarget.style.borderColor = "#ccc")}
+                        onMouseEnter={(e) => (e.currentTarget.style.borderColor = "#aaa")}
                         onMouseLeave={(e) => (e.currentTarget.style.borderColor = "#e8e8e8")}
                     >
-                        {googleLoading ? (
-                            <span style={{ fontSize: "14px", color: "#888" }}>Opening Google...</span>
-                        ) : (
-                            <><GoogleIcon /> Continue with Google</>
-                        )}
+                        {googleLoading
+                            ? "Opening Google..."
+                            : <><GoogleIcon /> Continue with Google</>
+                        }
                     </button>
 
-                    {/* Hidden Google button container (fallback) */}
-                    <div id="g-btn-container" style={{ marginTop: "8px" }} />
+                    {/* ✅ Hidden div where Google renders its button (gets auto-clicked) */}
+                    <div
+                        ref={googleBtnRef}
+                        style={{ position: "absolute", opacity: 0, pointerEvents: "none", top: 0, left: 0 }}
+                    />
 
-                    {/* Divider */}
-                    <div style={s.divider}>
-                        <div style={s.divLine} />
-                        <span style={s.divText}>OR</span>
-                        <div style={s.divLine} />
+                    <div style={S.divider}>
+                        <div style={S.divLine} /><span style={S.divText}>OR</span><div style={S.divLine} />
                     </div>
 
-                    {/* Error */}
-                    {error && <div style={s.error}>{error}</div>}
-
-                    {/* Form fields */}
-                    {tab === "register" && (
-                        <Field
-                            label="Full name"
-                            type="text"
-                            placeholder="John Doe"
-                            value={name}
-                            onChange={(e) => setName(e.target.value)}
-                            onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
-                        />
-                    )}
-                    <Field
-                        label="Email address"
-                        type="email"
-                        placeholder="you@example.com"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
-                    />
-                    <Field
-                        label="Password"
-                        type="password"
-                        placeholder={tab === "register" ? "Min 8 characters" : "Your password"}
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
-                    />
-
-                    {/* Forgot password (login only) */}
-                    {tab === "login" && (
-                        <div style={{ textAlign: "right", marginBottom: "4px", marginTop: "-4px" }}>
-                            <span style={{ fontSize: "13px", color: "#888", cursor: "pointer" }}
-                                onMouseEnter={(e) => (e.currentTarget.style.color = "#111")}
-                                onMouseLeave={(e) => (e.currentTarget.style.color = "#888")}
-                            >Forgot password?</span>
+                    {error && (
+                        <div style={S.error}>
+                            {typeof error === "string" ? error : JSON.stringify(error)}
                         </div>
                     )}
 
-                    {/* Submit */}
+                    {tab === "register" && (
+                        <Field label="Full name" placeholder="John Doe"
+                            value={name} onChange={(e) => setName(e.target.value)} onKeyDown={onEnter} />
+                    )}
+
+                    <Field label="Email address" type="email" placeholder="you@example.com"
+                        value={email} onChange={(e) => setEmail(e.target.value)} onKeyDown={onEnter} />
+
+                    <Field label="Password" type="password"
+                        placeholder={tab === "register" ? "Choose a password" : "Your password"}
+                        value={password} onChange={(e) => setPassword(e.target.value)} onKeyDown={onEnter} />
+
                     <button
-                        style={s.submitBtn(loading)}
+                        style={S.submitBtn(loading)}
                         onClick={handleSubmit}
                         disabled={loading}
                         onMouseEnter={(e) => { if (!loading) e.currentTarget.style.background = "#333"; }}
@@ -350,13 +313,9 @@ export default function AuthModal({ show, onClose }) {
                             : (tab === "login" ? "Sign in" : "Create account")}
                     </button>
 
-                    {/* Switch tab hint */}
-                    <p style={{ textAlign: "center", fontSize: "13px", color: "#aaa", marginTop: "20px" }}>
+                    <p style={S.switchRow}>
                         {tab === "login" ? "Don't have an account? " : "Already have an account? "}
-                        <span
-                            style={{ color: "#111", fontWeight: 600, cursor: "pointer" }}
-                            onClick={() => setTab(tab === "login" ? "register" : "login")}
-                        >
+                        <span style={S.switchLink} onClick={() => setTab(tab === "login" ? "register" : "login")}>
                             {tab === "login" ? "Sign up" : "Log in"}
                         </span>
                     </p>

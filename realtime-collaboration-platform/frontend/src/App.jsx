@@ -4,16 +4,26 @@ import Landing from "./pages/Landing";
 import Dashboard from "./pages/Dashboard";
 import AdminDashboard from "./pages/AdminDashboard";
 
-// ─── Protects routes — redirects to / if no token ─────────
-function ProtectedRoute({ children, requiredRole }) {
+/**
+ * Gateway route protection:
+ *   /api/auth/**    → permitAll
+ *   /api/admin/**   → hasRole("ADMIN")   → role claim = "ADMIN"
+ *   /api/user/**    → hasAnyRole("USER", "ADMIN")
+ *   anyExchange     → authenticated
+ *
+ * Frontend mirrors this:
+ *   /           → public (Landing)
+ *   /dashboard  → USER or ADMIN
+ *   /admin      → ADMIN only
+ */
+function ProtectedRoute({ children, adminOnly = false }) {
   const { accessToken, user } = useSelector((state) => state.auth);
 
   if (!accessToken) return <Navigate to="/" replace />;
 
-  // Role check
-  if (requiredRole && user?.role !== requiredRole) {
-    // Wrong role → send to their correct dashboard
-    return <Navigate to={user?.role === "ADMIN" ? "/admin" : "/dashboard"} replace />;
+  if (adminOnly && user?.role !== "ADMIN") {
+    // ADMIN tried /admin but role doesn't match — shouldn't happen normally
+    return <Navigate to="/dashboard" replace />;
   }
 
   return children;
@@ -26,7 +36,7 @@ export default function App() {
         {/* Public */}
         <Route path="/" element={<Landing />} />
 
-        {/* USER dashboard */}
+        {/* USER dashboard — accessible by USER and ADMIN */}
         <Route
           path="/dashboard"
           element={
@@ -36,17 +46,17 @@ export default function App() {
           }
         />
 
-        {/* ADMIN dashboard */}
+        {/* ADMIN dashboard — ADMIN only */}
         <Route
           path="/admin"
           element={
-            <ProtectedRoute requiredRole="ADMIN">
+            <ProtectedRoute adminOnly>
               <AdminDashboard />
             </ProtectedRoute>
           }
         />
 
-        {/* Fallback */}
+        {/* Catch-all */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>

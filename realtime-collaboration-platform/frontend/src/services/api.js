@@ -2,16 +2,17 @@ import axios from "axios";
 
 const API = axios.create({
     baseURL: "http://localhost:8080/api",
+    headers: { "Content-Type": "application/json" },
 });
 
-// Auto-attach JWT to every request
+// Attach JWT to every request
 API.interceptors.request.use((config) => {
     const token = localStorage.getItem("accessToken");
     if (token) config.headers.Authorization = `Bearer ${token}`;
     return config;
 });
 
-// On 401 → clear session and go home
+// 401 → clear session and redirect home
 API.interceptors.response.use(
     (res) => res,
     (err) => {

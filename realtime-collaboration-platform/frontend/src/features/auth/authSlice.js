@@ -1,5 +1,13 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import API from "../../services/api";
+import { getUserFromToken } from "../../services/jwtUtils";
+
+// ─── Helper: save tokens + decode user ────────────────────
+function saveSession(accessToken, refreshToken) {
+    localStorage.setItem("accessToken", accessToken);
+    localStorage.setItem("refreshToken", refreshToken);
+    return getUserFromToken(accessToken); // { email, role, exp }
+}
 
 // ─── Thunks ───────────────────────────────────────────────
 
@@ -8,10 +16,12 @@ export const loginUser = createAsyncThunk(
     async ({ email, password }, { rejectWithValue }) => {
         try {
             const res = await API.post("/auth/login", { email, password });
-            return res.data; // { accessToken, refreshToken }
+            const { accessToken, refreshToken } = res.data;
+            const user = saveSession(accessToken, refreshToken);
+            return { accessToken, refreshToken, user };
         } catch (err) {
             return rejectWithValue(
-                err.response?.data?.message || "Login failed. Please try again."
+                err.response?.data?.message || "Login failed. Please check your credentials."
             );
         }
     }
@@ -22,21 +32,26 @@ export const registerUser = createAsyncThunk(
     async ({ name, email, password }, { rejectWithValue }) => {
         try {
             const res = await API.post("/auth/register", { name, email, password });
-            return res.data;
+            const { accessToken, refreshToken } = res.data;
+            const user = saveSession(accessToken, refreshToken);
+            return { accessToken, refreshToken, user };
         } catch (err) {
             return rejectWithValue(
-                err.response?.data?.message || "Registration failed. Please try again."
+                err.response?.data?.message || "Registration failed. Try a different email."
             );
         }
     }
 );
 
-export const googleLogin = createAsyncThunk(
+// Google: frontend gets idToken from Google SDK, sends to backend
+export const googleLoginUser = createAsyncThunk(
     "auth/google",
     async (idToken, { rejectWithValue }) => {
         try {
             const res = await API.post("/auth/google", { idToken });
-            return res.data;
+            const { accessToken, refreshToken } = res.data;
+            const user = saveSession(accessToken, refreshToken);
+            return { accessToken, refreshToken, user };
         } catch (err) {
             return rejectWithValue(
                 err.response?.data?.message || "Google login failed."
@@ -46,27 +61,31 @@ export const googleLogin = createAsyncThunk(
 );
 
 export const fetchProfile = createAsyncThunk(
-    "auth/fetchProfile",
+    "auth/profile",
     async (_, { rejectWithValue }) => {
         try {
             const res = await API.get("/user/profile");
-            return res.data;
-        } catch (err) {
-            return rejectWithValue("Could not fetch profile.");
+            return res.data; // { name, email, ... }
+        } catch {
+            return rejectWithValue(null);
         }
     }
 );
 
-// ─── Slice ────────────────────────────────────────────────
+// ─── Initial state ────────────────────────────────────────
+const storedToken = localStorage.getItem("accessToken");
+const storedUser = getUserFromToken(storedToken); // decode on page load
 
 const initialState = {
-    accessToken: localStorage.getItem("accessToken") || null,
-    refreshToken: localStorage.getItem("refreshToken") || null,
-    user: null,
+    accessToken: storedToken,
+    refreshToken: localStorage.getItem("refreshToken"),
+    user: storedUser,   // { email, role } decoded from JWT
+    profile: null,      // full profile from /user/profile (name etc.)
     loading: false,
     error: null,
 };
 
+// ─── Slice ────────────────────────────────────────────────
 const authSlice = createSlice({
     name: "auth",
     initialState,
@@ -75,6 +94,7 @@ const authSlice = createSlice({
             state.accessToken = null;
             state.refreshToken = null;
             state.user = null;
+            state.profile = null;
             localStorage.removeItem("accessToken");
             localStorage.removeItem("refreshToken");
         },
@@ -83,58 +103,36 @@ const authSlice = createSlice({
         },
     },
     extraReducers: (builder) => {
-        // ── Login ──
-        builder
-            .addCase(loginUser.pending, (state) => {
-                state.loading = true;
-                state.error = null;
-            })
-            .addCase(loginUser.fulfilled, (state, action) => {
-                state.loading = false;
-                state.accessToken = action.payload.accessToken;
-                state.refreshToken = action.payload.refreshToken;
-                localStorage.setItem("accessToken", action.payload.accessToken);
-                localStorage.setItem("refreshToken", action.payload.refreshToken);
-            })
-            .addCase(loginUser.rejected, (state, action) => {
-                state.loading = false;
-                state.error = action.payload;
-            });
+        const handlePending = (state) => {
+            state.loading = true;
+            state.error = null;
+        };
+        const handleFulfilled = (state, action) => {
+            state.loading = false;
+            state.accessToken = action.payload.accessToken;
+            state.refreshToken = action.payload.refreshToken;
+            state.user = action.payload.user;
+        };
+        const handleRejected = (state, action) => {
+            state.loading = false;
+            state.error = action.payload;
+        };
 
-        // ── Register ──
         builder
-            .addCase(registerUser.pending, (state) => {
-                state.loading = true;
-                state.error = null;
-            })
-            .addCase(registerUser.fulfilled, (state, action) => {
-                state.loading = false;
-                state.accessToken = action.payload.accessToken;
-                state.refreshToken = action.payload.refreshToken;
-                localStorage.setItem("accessToken", action.payload.accessToken);
-                localStorage.setItem("refreshToken", action.payload.refreshToken);
-            })
-            .addCase(registerUser.rejected, (state, action) => {
-                state.loading = false;
-                state.error = action.payload;
-            });
+            .addCase(loginUser.pending, handlePending)
+            .addCase(loginUser.fulfilled, handleFulfilled)
+            .addCase(loginUser.rejected, handleRejected)
 
-        // ── Google ──
-        builder
-            .addCase(googleLogin.fulfilled, (state, action) => {
-                state.accessToken = action.payload.accessToken;
-                state.refreshToken = action.payload.refreshToken;
-                localStorage.setItem("accessToken", action.payload.accessToken);
-                localStorage.setItem("refreshToken", action.payload.refreshToken);
-            })
-            .addCase(googleLogin.rejected, (state, action) => {
-                state.error = action.payload;
-            });
+            .addCase(registerUser.pending, handlePending)
+            .addCase(registerUser.fulfilled, handleFulfilled)
+            .addCase(registerUser.rejected, handleRejected)
 
-        // ── Profile ──
-        builder
+            .addCase(googleLoginUser.pending, handlePending)
+            .addCase(googleLoginUser.fulfilled, handleFulfilled)
+            .addCase(googleLoginUser.rejected, handleRejected)
+
             .addCase(fetchProfile.fulfilled, (state, action) => {
-                state.user = action.payload;
+                state.profile = action.payload;
             });
     },
 });

@@ -4,27 +4,23 @@ import { useNavigate } from "react-router-dom";
 import { logout, fetchProfile } from "../features/auth/authSlice";
 import API from "../services/api";
 
-/**
- * DocumentResponse from backend:
- *   { id, title, content, createdAt, updatedAt }
- *
- * NOTE: DocumentPermission role (OWNER/EDITOR/VIEWER) is NOT in DocumentResponse.
- * We fetch permissions separately to show the user's role on each doc.
- *
- * ProfileResponse: { email, fullName, bio, phone }
- */
-
 const NAV = [
     { key: "documents", icon: "📄", label: "My Documents" },
     { key: "shared", icon: "👥", label: "Shared with me" },
     { key: "recent", icon: "🕐", label: "Recent" },
+    { key: "teams", icon: "🏠", label: "My Teams" },
 ];
 
-// Document role pill colors
 const ROLE_STYLE = {
     OWNER: { bg: "#111", color: "#fff" },
     EDITOR: { bg: "#e8f4ff", color: "#18a0fb" },
     VIEWER: { bg: "#f5f5f5", color: "#888" },
+};
+
+const TEAM_ROLE_STYLE = {
+    OWNER: { bg: "#111", color: "#fff" },
+    ADMIN: { bg: "#f0e8ff", color: "#a259ff" },
+    MEMBER: { bg: "#f5f5f5", color: "#888" },
 };
 
 const S = {
@@ -71,12 +67,12 @@ const S = {
         padding: "22px", cursor: "pointer", transition: "all 0.15s",
         display: "flex", flexDirection: "column",
     },
-    rolePill: (role) => ({
+    rolePill: (role, styleMap) => ({
         display: "inline-block", fontSize: "10px", fontWeight: 700,
         padding: "3px 9px", borderRadius: "100px", letterSpacing: "0.5px",
         alignSelf: "flex-start", marginBottom: "12px",
-        background: ROLE_STYLE[role]?.bg || "#f5f5f5",
-        color: ROLE_STYLE[role]?.color || "#888",
+        background: (styleMap || ROLE_STYLE)[role]?.bg || "#f5f5f5",
+        color: (styleMap || ROLE_STYLE)[role]?.color || "#888",
     }),
     docTitle: { fontSize: "15px", fontWeight: 600, color: "#111", marginBottom: "6px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
     docMeta: { fontSize: "12px", color: "#aaa", marginBottom: "16px" },
@@ -85,14 +81,14 @@ const S = {
         flex: 1, padding: "8px", border: "none", borderRadius: "8px",
         fontSize: "13px", cursor: "pointer", fontFamily: "inherit",
         transition: "background 0.15s",
-        background: variant === "danger" ? "#fff5f5" : variant === "primary" ? "#e8f4ff" : "#f7f7f7",
-        color: variant === "danger" ? "#e53e3e" : variant === "primary" ? "#18a0fb" : "#333",
+        background: variant === "danger" ? "#fff5f5" : variant === "primary" ? "#e8f4ff" : variant === "purple" ? "#f0e8ff" : "#f7f7f7",
+        color: variant === "danger" ? "#e53e3e" : variant === "primary" ? "#18a0fb" : variant === "purple" ? "#a259ff" : "#333",
     }),
     empty: { display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "55vh", gap: "12px" },
     skeleton: { background: "#f5f5f5", borderRadius: "14px", height: "150px" },
-    // Modals
     overlay: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 500 },
     modalBox: { background: "#fff", borderRadius: "16px", padding: "36px", width: "400px", boxShadow: "0 20px 60px rgba(0,0,0,0.15)" },
+    modalBoxWide: { background: "#fff", borderRadius: "16px", padding: "36px", width: "520px", boxShadow: "0 20px 60px rgba(0,0,0,0.15)", maxHeight: "80vh", overflow: "auto" },
     modalTitle: { fontSize: "18px", fontWeight: 700, marginBottom: "6px" },
     modalSub: { fontSize: "14px", color: "#888", marginBottom: "20px" },
     modalInput: { width: "100%", padding: "11px 14px", border: "1.5px solid #e8e8e8", borderRadius: "10px", fontSize: "14px", fontFamily: "inherit", outline: "none", boxSizing: "border-box", marginBottom: "12px" },
@@ -118,48 +114,58 @@ export default function Dashboard() {
     const { accessToken, user, profile } = useSelector((st) => st.auth);
 
     const [activeNav, setActiveNav] = useState("documents");
-    const [docs, setDocs] = useState([]);           // DocumentResponse[]
-    const [docRoles, setDocRoles] = useState({});   // { [docId]: "OWNER"|"EDITOR"|"VIEWER" }
     const [loading, setLoading] = useState(true);
 
-    // Create modal
+    // ── Documents state ──
+    const [docs, setDocs] = useState([]);
+    const [docRoles, setDocRoles] = useState({});
     const [showCreate, setShowCreate] = useState(false);
     const [newTitle, setNewTitle] = useState("");
     const [creating, setCreating] = useState(false);
-
-    // Share modal — ShareRequest: { email, role }
     const [shareDoc, setShareDoc] = useState(null);
     const [shareEmail, setShareEmail] = useState("");
-    const [shareRole, setShareRole] = useState("EDITOR"); // "EDITOR" | "VIEWER"
+    const [shareRole, setShareRole] = useState("EDITOR");
     const [sharing, setSharing] = useState(false);
     const [shareError, setShareError] = useState("");
 
-    // Profile modal
-    const [showProfile, setShowProfile] = useState(false);
+    // ── Teams state ──
+    const [teams, setTeams] = useState([]);
+    const [showCreateTeam, setShowCreateTeam] = useState(false);
+    const [newTeamName, setNewTeamName] = useState("");
+    const [newTeamDesc, setNewTeamDesc] = useState("");
+    const [creatingTeam, setCreatingTeam] = useState(false);
+    const [viewTeam, setViewTeam] = useState(null);       // team whose members we're viewing
+    const [teamMembers, setTeamMembers] = useState([]);
+    const [loadingMembers, setLoadingMembers] = useState(false);
+    const [inviteTeam, setInviteTeam] = useState(null);   // team we're inviting to
+    const [inviteEmail, setInviteEmail] = useState("");
+    const [inviteRole, setInviteRole] = useState("MEMBER");
+    const [inviting, setInviting] = useState(false);
+    const [inviteError, setInviteError] = useState("");
 
     // Guard
     useEffect(() => {
         if (!accessToken) navigate("/");
     }, [accessToken]);
 
-    // Fetch profile — ProfileResponse: { email, fullName, bio, phone }
     useEffect(() => {
         if (accessToken && !profile) dispatch(fetchProfile());
     }, []);
 
     useEffect(() => {
-        fetchDocs();
+        if (activeNav === "teams") {
+            fetchTeams();
+        } else {
+            fetchDocs();
+        }
     }, [activeNav]);
 
+    // ── Document API ──
     const fetchDocs = async () => {
         setLoading(true);
         try {
-            // GET /api/documents → List<DocumentResponse>
-            // { id, title, content, createdAt, updatedAt }
             const res = await API.get("/documents");
             setDocs(res.data);
-            // We don't get role from DocumentResponse, default to OWNER for owned docs
-            // Real role would need a separate permissions endpoint
             const roles = {};
             res.data.forEach(d => { roles[d.id] = "OWNER"; });
             setDocRoles(roles);
@@ -175,7 +181,6 @@ export default function Dashboard() {
         if (!newTitle.trim()) return;
         setCreating(true);
         try {
-            // POST /api/documents → CreateDocumentRequest: { title, content }
             await API.post("/documents", { title: newTitle.trim(), content: "" });
             setNewTitle(""); setShowCreate(false);
             fetchDocs();
@@ -190,7 +195,6 @@ export default function Dashboard() {
         e.stopPropagation();
         if (!window.confirm("Delete this document? This cannot be undone.")) return;
         try {
-            // DELETE /api/documents/{id}
             await API.delete(`/documents/${id}`);
             setDocs(prev => prev.filter(d => d.id !== id));
         } catch (e) {
@@ -202,28 +206,109 @@ export default function Dashboard() {
         if (!shareEmail.trim()) return;
         setSharing(true); setShareError("");
         try {
-            // POST /api/documents/{id}/share → ShareRequest: { email, role }
-            // role is Role enum: "OWNER"|"EDITOR"|"VIEWER"
             await API.post(`/documents/${shareDoc.id}/share`, {
-                email: shareEmail.trim(),
-                role: shareRole,
+                email: shareEmail.trim(), role: shareRole,
             });
             setShareDoc(null); setShareEmail(""); setShareRole("EDITOR");
         } catch (e) {
-            setShareError(e.response?.data?.message || "Share failed. User may already have access.");
+            setShareError(e.response?.data?.message || "Share failed.");
         } finally {
             setSharing(false);
         }
     };
 
-    const handleLogout = () => {
-        dispatch(logout());
-        navigate("/");
+    // ── Team API ──
+    const fetchTeams = async () => {
+        setLoading(true);
+        try {
+            const res = await API.get("/teams");
+            setTeams(res.data);
+        } catch (e) {
+            console.error("Failed to fetch teams", e);
+            setTeams([]);
+        } finally {
+            setLoading(false);
+        }
     };
 
-    // profile.fullName is the field name from ProfileResponse
+    const handleCreateTeam = async () => {
+        if (!newTeamName.trim()) return;
+        setCreatingTeam(true);
+        try {
+            await API.post("/teams", {
+                name: newTeamName.trim(),
+                description: newTeamDesc.trim() || null,
+            });
+            setNewTeamName(""); setNewTeamDesc("");
+            setShowCreateTeam(false);
+            fetchTeams();
+        } catch (e) {
+            console.error("Create team failed", e);
+        } finally {
+            setCreatingTeam(false);
+        }
+    };
+
+    const handleViewMembers = async (team) => {
+        setViewTeam(team);
+        setLoadingMembers(true);
+        try {
+            const res = await API.get(`/teams/${team.id}/members`);
+            setTeamMembers(res.data);
+        } catch (e) {
+            console.error("Failed to fetch members", e);
+            setTeamMembers([]);
+        } finally {
+            setLoadingMembers(false);
+        }
+    };
+
+    const handleInvite = async () => {
+        if (!inviteEmail.trim()) return;
+        setInviting(true); setInviteError("");
+        try {
+            await API.post(`/teams/${inviteTeam.id}/members`, {
+                email: inviteEmail.trim(),
+                role: inviteRole,
+            });
+            setInviteTeam(null); setInviteEmail(""); setInviteRole("MEMBER");
+        } catch (e) {
+            setInviteError(e.response?.data?.message || "Invite failed. User may already be a member.");
+        } finally {
+            setInviting(false);
+        }
+    };
+
+    const handleDeleteTeam = async (teamId, e) => {
+        e.stopPropagation();
+        if (!window.confirm("Delete this team? This cannot be undone.")) return;
+        try {
+            await API.delete(`/teams/${teamId}`);
+            setTeams(prev => prev.filter(t => t.id !== teamId));
+        } catch (e) {
+            console.error("Delete team failed", e);
+        }
+    };
+
+    const handleRemoveMember = async (teamId, email) => {
+        if (!window.confirm(`Remove ${email} from team?`)) return;
+        try {
+            await API.delete(`/teams/${teamId}/members/${email}`);
+            setTeamMembers(prev => prev.filter(m => m.userEmail !== email));
+        } catch (e) {
+            console.error("Remove member failed", e);
+        }
+    };
+
+    const handleLogout = () => { dispatch(logout()); navigate("/"); };
+
     const displayName = profile?.fullName || user?.email?.split("@")[0] || "User";
     const initials = displayName.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2);
+
+    // ── Topbar button label ──
+    const topbarBtn = activeNav === "teams"
+        ? { label: "+ New team", action: () => setShowCreateTeam(true) }
+        : { label: "+ New document", action: () => setShowCreate(true) };
 
     return (
         <div style={S.root}>
@@ -255,7 +340,6 @@ export default function Dashboard() {
                         </button>
                     ))}
 
-                    {/* Admin link if user is ADMIN */}
                     {user?.role === "ADMIN" && (
                         <>
                             <div style={{ ...S.navLabel, marginTop: "16px" }}>ADMIN</div>
@@ -272,19 +356,11 @@ export default function Dashboard() {
                 </nav>
 
                 <div style={S.sideBottom}>
-                    {/* User info — profile.fullName from ProfileResponse */}
-                    <div
-                        style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "12px", cursor: "pointer" }}
-                        onClick={() => setShowProfile(true)}
-                    >
+                    <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "12px" }}>
                         <div style={S.avatar("#18a0fb")}>{initials}</div>
                         <div style={{ minWidth: 0 }}>
-                            <div style={{ fontSize: "13px", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                {displayName}
-                            </div>
-                            <div style={{ fontSize: "11px", color: "#999", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                {user?.email}
-                            </div>
+                            <div style={{ fontSize: "13px", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{displayName}</div>
+                            <div style={{ fontSize: "11px", color: "#999", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{user?.email}</div>
                         </div>
                     </div>
                     <button
@@ -305,126 +381,174 @@ export default function Dashboard() {
                         </span>
                         {!loading && (
                             <span style={{ fontSize: "13px", color: "#bbb" }}>
-                                {docs.length} document{docs.length !== 1 ? "s" : ""}
+                                {activeNav === "teams"
+                                    ? `${teams.length} team${teams.length !== 1 ? "s" : ""}`
+                                    : `${docs.length} document${docs.length !== 1 ? "s" : ""}`
+                                }
                             </span>
                         )}
                     </div>
                     <button
                         style={S.createBtn}
-                        onClick={() => setShowCreate(true)}
+                        onClick={topbarBtn.action}
                         onMouseEnter={(e) => (e.currentTarget.style.background = "#333")}
                         onMouseLeave={(e) => (e.currentTarget.style.background = "#111")}
                     >
-                        <span style={{ fontSize: "18px", lineHeight: 1 }}>+</span> New document
+                        {topbarBtn.label}
                     </button>
                 </div>
 
                 <div style={S.content}>
-                    {loading ? <SkeletonGrid /> : docs.length === 0 ? (
-                        <div style={S.empty}>
-                            <div style={{ fontSize: "52px" }}>📄</div>
-                            <div style={{ fontSize: "17px", fontWeight: 600, color: "#555" }}>No documents yet</div>
-                            <div style={{ fontSize: "14px", color: "#aaa" }}>Create your first document to get started</div>
-                            <button style={{ ...S.createBtn, marginTop: "8px" }} onClick={() => setShowCreate(true)}>
-                                + New document
-                            </button>
-                        </div>
-                    ) : (
-                        <div style={S.grid}>
-                            {docs.map(doc => {
-                                const role = docRoles[doc.id] || "OWNER";
-                                const canEdit = role === "OWNER" || role === "EDITOR";
-                                const canShare = role === "OWNER";
-                                const canDelete = role === "OWNER";
-                                return (
-                                    <div
-                                        key={doc.id}
-                                        style={S.card}
-                                        onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#ccc"; e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.07)"; e.currentTarget.style.transform = "translateY(-2px)"; }}
-                                        onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#ebebeb"; e.currentTarget.style.boxShadow = "none"; e.currentTarget.style.transform = "translateY(0)"; }}
-                                    >
-                                        <span style={S.rolePill(role)}>{role}</span>
-                                        <div style={{ fontSize: "28px", marginBottom: "10px" }}>📝</div>
-                                        {/* DocumentResponse.title */}
-                                        <div style={S.docTitle}>{doc.title || "Untitled"}</div>
-                                        {/* DocumentResponse.updatedAt / createdAt */}
-                                        <div style={S.docMeta}>
-                                            {doc.updatedAt ? `Updated ${formatDate(doc.updatedAt)}` : `Created ${formatDate(doc.createdAt)}`}
+
+                    {/* ── Documents view ── */}
+                    {activeNav !== "teams" && (
+                        loading ? <SkeletonGrid /> : docs.length === 0 ? (
+                            <div style={S.empty}>
+                                <div style={{ fontSize: "52px" }}>📄</div>
+                                <div style={{ fontSize: "17px", fontWeight: 600, color: "#555" }}>No documents yet</div>
+                                <div style={{ fontSize: "14px", color: "#aaa" }}>Create your first document to get started</div>
+                                <button style={{ ...S.createBtn, marginTop: "8px" }} onClick={() => setShowCreate(true)}>+ New document</button>
+                            </div>
+                        ) : (
+                            <div style={S.grid}>
+                                {docs.map(doc => {
+                                    const role = docRoles[doc.id] || "OWNER";
+                                    const canShare = role === "OWNER";
+                                    const canDelete = role === "OWNER";
+                                    return (
+                                        <div key={doc.id} style={S.card}
+                                            onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#ccc"; e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.07)"; e.currentTarget.style.transform = "translateY(-2px)"; }}
+                                            onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#ebebeb"; e.currentTarget.style.boxShadow = "none"; e.currentTarget.style.transform = "translateY(0)"; }}
+                                        >
+                                            <span style={S.rolePill(role, ROLE_STYLE)}>{role}</span>
+                                            <div style={{ fontSize: "28px", marginBottom: "10px" }}>📝</div>
+                                            <div style={S.docTitle}>{doc.title || "Untitled"}</div>
+                                            <div style={S.docMeta}>
+                                                {doc.updatedAt ? `Updated ${formatDate(doc.updatedAt)}` : `Created ${formatDate(doc.createdAt)}`}
+                                            </div>
+                                            <div style={S.actionRow}>
+                                                <button style={S.actionBtn("default")}
+                                                    onMouseEnter={(e) => (e.currentTarget.style.background = "#eee")}
+                                                    onMouseLeave={(e) => (e.currentTarget.style.background = "#f7f7f7")}
+                                                    onClick={(e) => e.stopPropagation()}
+                                                >Open</button>
+                                                {canShare && (
+                                                    <button style={S.actionBtn("primary")}
+                                                        onClick={(e) => { e.stopPropagation(); setShareDoc(doc); }}
+                                                        onMouseEnter={(e) => (e.currentTarget.style.background = "#d0e8ff")}
+                                                        onMouseLeave={(e) => (e.currentTarget.style.background = "#e8f4ff")}
+                                                    >Share</button>
+                                                )}
+                                                {canDelete && (
+                                                    <button style={S.actionBtn("danger")}
+                                                        onClick={(e) => handleDelete(doc.id, e)}
+                                                        onMouseEnter={(e) => (e.currentTarget.style.background = "#fed7d7")}
+                                                        onMouseLeave={(e) => (e.currentTarget.style.background = "#fff5f5")}
+                                                    >Delete</button>
+                                                )}
+                                            </div>
                                         </div>
-                                        <div style={S.actionRow}>
-                                            <button style={S.actionBtn("default")}
-                                                onMouseEnter={(e) => (e.currentTarget.style.background = "#eee")}
-                                                onMouseLeave={(e) => (e.currentTarget.style.background = "#f7f7f7")}
-                                                onClick={(e) => e.stopPropagation()}
-                                            >Open</button>
-                                            {canShare && (
-                                                <button style={S.actionBtn("primary")}
-                                                    onClick={(e) => { e.stopPropagation(); setShareDoc(doc); }}
-                                                    onMouseEnter={(e) => (e.currentTarget.style.background = "#d0e8ff")}
-                                                    onMouseLeave={(e) => (e.currentTarget.style.background = "#e8f4ff")}
-                                                >Share</button>
-                                            )}
-                                            {canDelete && (
-                                                <button style={S.actionBtn("danger")}
-                                                    onClick={(e) => handleDelete(doc.id, e)}
-                                                    onMouseEnter={(e) => (e.currentTarget.style.background = "#fed7d7")}
-                                                    onMouseLeave={(e) => (e.currentTarget.style.background = "#fff5f5")}
-                                                >Delete</button>
-                                            )}
+                                    );
+                                })}
+                            </div>
+                        )
+                    )}
+
+                    {/* ── Teams view ── */}
+                    {activeNav === "teams" && (
+                        loading ? <SkeletonGrid /> : teams.length === 0 ? (
+                            <div style={S.empty}>
+                                <div style={{ fontSize: "52px" }}>🏠</div>
+                                <div style={{ fontSize: "17px", fontWeight: 600, color: "#555" }}>No teams yet</div>
+                                <div style={{ fontSize: "14px", color: "#aaa" }}>Create a team to collaborate with others</div>
+                                <button style={{ ...S.createBtn, marginTop: "8px" }} onClick={() => setShowCreateTeam(true)}>+ New team</button>
+                            </div>
+                        ) : (
+                            <div style={S.grid}>
+                                {teams.map(team => {
+                                    const isOwner = team.ownerEmail === user?.email;
+                                    return (
+                                        <div key={team.id} style={S.card}
+                                            onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#ccc"; e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.07)"; e.currentTarget.style.transform = "translateY(-2px)"; }}
+                                            onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#ebebeb"; e.currentTarget.style.boxShadow = "none"; e.currentTarget.style.transform = "translateY(0)"; }}
+                                        >
+                                            <span style={S.rolePill(isOwner ? "OWNER" : "MEMBER", TEAM_ROLE_STYLE)}>
+                                                {isOwner ? "OWNER" : "MEMBER"}
+                                            </span>
+                                            <div style={{ fontSize: "28px", marginBottom: "10px" }}>🏠</div>
+                                            <div style={S.docTitle}>{team.name}</div>
+                                            <div style={S.docMeta}>
+                                                {team.description || "No description"} · Created {formatDate(team.createdAt)}
+                                            </div>
+                                            <div style={S.actionRow}>
+                                                <button style={S.actionBtn("default")}
+                                                    onClick={(e) => { e.stopPropagation(); handleViewMembers(team); }}
+                                                    onMouseEnter={(e) => (e.currentTarget.style.background = "#eee")}
+                                                    onMouseLeave={(e) => (e.currentTarget.style.background = "#f7f7f7")}
+                                                >Members</button>
+                                                {isOwner && (
+                                                    <button style={S.actionBtn("purple")}
+                                                        onClick={(e) => { e.stopPropagation(); setInviteTeam(team); }}
+                                                        onMouseEnter={(e) => (e.currentTarget.style.background = "#e0d0ff")}
+                                                        onMouseLeave={(e) => (e.currentTarget.style.background = "#f0e8ff")}
+                                                    >Invite</button>
+                                                )}
+                                                {isOwner && (
+                                                    <button style={S.actionBtn("danger")}
+                                                        onClick={(e) => handleDeleteTeam(team.id, e)}
+                                                        onMouseEnter={(e) => (e.currentTarget.style.background = "#fed7d7")}
+                                                        onMouseLeave={(e) => (e.currentTarget.style.background = "#fff5f5")}
+                                                    >Delete</button>
+                                                )}
+                                            </div>
                                         </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
+                                    );
+                                })}
+                            </div>
+                        )
                     )}
                 </div>
             </div>
 
-            {/* ── Create Modal ── */}
+            {/* ── Create Document Modal ── */}
             {showCreate && (
                 <div style={S.overlay} onClick={() => setShowCreate(false)}>
                     <div style={S.modalBox} onClick={e => e.stopPropagation()}>
                         <div style={S.modalTitle}>New document</div>
                         <div style={S.modalSub}>Give your document a title.</div>
                         <label style={S.modalLabel}>Title</label>
-                        <input
-                            style={S.modalInput} autoFocus type="text"
+                        <input style={S.modalInput} autoFocus type="text"
                             placeholder="e.g. Q4 Strategy Plan"
-                            value={newTitle}
-                            onChange={e => setNewTitle(e.target.value)}
+                            value={newTitle} onChange={e => setNewTitle(e.target.value)}
                             onKeyDown={e => e.key === "Enter" && handleCreate()}
                             onFocus={e => (e.target.style.borderColor = "#111")}
                             onBlur={e => (e.target.style.borderColor = "#e8e8e8")}
                         />
                         <div style={S.btnRow}>
                             <button style={S.cancelBtn} onClick={() => setShowCreate(false)}>Cancel</button>
-                            <button
-                                style={{ ...S.confirmBtn(), opacity: creating ? 0.7 : 1, cursor: creating ? "not-allowed" : "pointer" }}
-                                onClick={handleCreate} disabled={creating}
-                            >{creating ? "Creating..." : "Create document"}</button>
+                            <button style={{ ...S.confirmBtn(), opacity: creating ? 0.7 : 1 }}
+                                onClick={handleCreate} disabled={creating}>
+                                {creating ? "Creating..." : "Create document"}
+                            </button>
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* ── Share Modal ── */}
-            {/* ShareRequest: { email: string, role: Role } where Role = "EDITOR" | "VIEWER" */}
+            {/* ── Share Document Modal ── */}
             {shareDoc && (
                 <div style={S.overlay} onClick={() => { setShareDoc(null); setShareError(""); }}>
                     <div style={S.modalBox} onClick={e => e.stopPropagation()}>
                         <div style={S.modalTitle}>Share document</div>
                         <div style={S.modalSub}>"{shareDoc.title}"</div>
                         <label style={S.modalLabel}>Teammate's email</label>
-                        <input
-                            style={S.modalInput} autoFocus type="email"
+                        <input style={S.modalInput} autoFocus type="email"
                             placeholder="teammate@example.com"
-                            value={shareEmail}
-                            onChange={e => setShareEmail(e.target.value)}
+                            value={shareEmail} onChange={e => setShareEmail(e.target.value)}
                             onFocus={e => (e.target.style.borderColor = "#111")}
                             onBlur={e => (e.target.style.borderColor = "#e8e8e8")}
                         />
                         <label style={S.modalLabel}>Permission</label>
-                        {/* Can only share as EDITOR or VIEWER — not OWNER (backend enforces this) */}
                         <select style={S.select} value={shareRole} onChange={e => setShareRole(e.target.value)}>
                             <option value="EDITOR">Editor — can view and edit</option>
                             <option value="VIEWER">Viewer — can only view</option>
@@ -432,10 +556,124 @@ export default function Dashboard() {
                         {shareError && <div style={{ fontSize: "13px", color: "#e53e3e", marginBottom: "12px" }}>{shareError}</div>}
                         <div style={S.btnRow}>
                             <button style={S.cancelBtn} onClick={() => { setShareDoc(null); setShareError(""); }}>Cancel</button>
+                            <button style={{ ...S.confirmBtn("#18a0fb"), opacity: sharing ? 0.7 : 1 }}
+                                onClick={handleShare} disabled={sharing}>
+                                {sharing ? "Sharing..." : "Send invite"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Create Team Modal ── */}
+            {showCreateTeam && (
+                <div style={S.overlay} onClick={() => setShowCreateTeam(false)}>
+                    <div style={S.modalBox} onClick={e => e.stopPropagation()}>
+                        <div style={S.modalTitle}>New team</div>
+                        <div style={S.modalSub}>Create a team to collaborate with others.</div>
+                        <label style={S.modalLabel}>Team name</label>
+                        <input style={S.modalInput} autoFocus type="text"
+                            placeholder="e.g. Design Team"
+                            value={newTeamName} onChange={e => setNewTeamName(e.target.value)}
+                            onKeyDown={e => e.key === "Enter" && handleCreateTeam()}
+                            onFocus={e => (e.target.style.borderColor = "#111")}
+                            onBlur={e => (e.target.style.borderColor = "#e8e8e8")}
+                        />
+                        <label style={S.modalLabel}>Description (optional)</label>
+                        <input style={S.modalInput} type="text"
+                            placeholder="What does this team work on?"
+                            value={newTeamDesc} onChange={e => setNewTeamDesc(e.target.value)}
+                            onFocus={e => (e.target.style.borderColor = "#111")}
+                            onBlur={e => (e.target.style.borderColor = "#e8e8e8")}
+                        />
+                        <div style={S.btnRow}>
+                            <button style={S.cancelBtn} onClick={() => setShowCreateTeam(false)}>Cancel</button>
+                            <button style={{ ...S.confirmBtn(), opacity: creatingTeam ? 0.7 : 1 }}
+                                onClick={handleCreateTeam} disabled={creatingTeam}>
+                                {creatingTeam ? "Creating..." : "Create team"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── View Members Modal ── */}
+            {viewTeam && (
+                <div style={S.overlay} onClick={() => setViewTeam(null)}>
+                    <div style={S.modalBoxWide} onClick={e => e.stopPropagation()}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                            <div style={S.modalTitle}>{viewTeam.name}</div>
                             <button
-                                style={{ ...S.confirmBtn("#18a0fb"), opacity: sharing ? 0.7 : 1, cursor: sharing ? "not-allowed" : "pointer" }}
-                                onClick={handleShare} disabled={sharing}
-                            >{sharing ? "Sharing..." : "Send invite"}</button>
+                                style={{ background: "none", border: "none", fontSize: "18px", color: "#bbb", cursor: "pointer" }}
+                                onClick={() => setViewTeam(null)}
+                            >×</button>
+                        </div>
+                        <div style={S.modalSub}>Team members</div>
+                        {loadingMembers ? (
+                            <div style={{ color: "#aaa", fontSize: "14px" }}>Loading members...</div>
+                        ) : teamMembers.length === 0 ? (
+                            <div style={{ color: "#aaa", fontSize: "14px" }}>No members found.</div>
+                        ) : (
+                            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                                {teamMembers.map(m => (
+                                    <div key={m.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 14px", background: "#fafafa", borderRadius: "10px", border: "1px solid #f0f0f0" }}>
+                                        <div>
+                                            <div style={{ fontSize: "14px", fontWeight: 500, color: "#111" }}>{m.userEmail}</div>
+                                            <div style={{ fontSize: "11px", color: "#aaa", marginTop: "2px" }}>
+                                                Joined {formatDate(m.joinedAt)}
+                                            </div>
+                                        </div>
+                                        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                                            <span style={S.rolePill(m.role, TEAM_ROLE_STYLE)}>{m.role}</span>
+                                            {viewTeam.ownerEmail === user?.email && m.role !== "OWNER" && (
+                                                <button
+                                                    style={{ padding: "4px 10px", background: "#fff5f5", border: "none", borderRadius: "6px", fontSize: "12px", color: "#e53e3e", cursor: "pointer" }}
+                                                    onClick={() => handleRemoveMember(viewTeam.id, m.userEmail)}
+                                                    onMouseEnter={(e) => (e.currentTarget.style.background = "#fed7d7")}
+                                                    onMouseLeave={(e) => (e.currentTarget.style.background = "#fff5f5")}
+                                                >Remove</button>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                        <div style={{ marginTop: "20px" }}>
+                            <button style={{ ...S.confirmBtn("#a259ff"), width: "100%" }}
+                                onClick={() => { setViewTeam(null); setInviteTeam(viewTeam); }}>
+                                + Invite member
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Invite Member Modal ── */}
+            {inviteTeam && (
+                <div style={S.overlay} onClick={() => { setInviteTeam(null); setInviteError(""); }}>
+                    <div style={S.modalBox} onClick={e => e.stopPropagation()}>
+                        <div style={S.modalTitle}>Invite to {inviteTeam.name}</div>
+                        <div style={S.modalSub}>Add a teammate by their email address.</div>
+                        <label style={S.modalLabel}>Email address</label>
+                        <input style={S.modalInput} autoFocus type="email"
+                            placeholder="teammate@example.com"
+                            value={inviteEmail} onChange={e => setInviteEmail(e.target.value)}
+                            onKeyDown={e => e.key === "Enter" && handleInvite()}
+                            onFocus={e => (e.target.style.borderColor = "#111")}
+                            onBlur={e => (e.target.style.borderColor = "#e8e8e8")}
+                        />
+                        <label style={S.modalLabel}>Role</label>
+                        <select style={S.select} value={inviteRole} onChange={e => setInviteRole(e.target.value)}>
+                            <option value="MEMBER">Member — standard access</option>
+                            <option value="ADMIN">Admin — can invite others</option>
+                        </select>
+                        {inviteError && <div style={{ fontSize: "13px", color: "#e53e3e", marginBottom: "12px" }}>{inviteError}</div>}
+                        <div style={S.btnRow}>
+                            <button style={S.cancelBtn} onClick={() => { setInviteTeam(null); setInviteError(""); }}>Cancel</button>
+                            <button style={{ ...S.confirmBtn("#a259ff"), opacity: inviting ? 0.7 : 1 }}
+                                onClick={handleInvite} disabled={inviting}>
+                                {inviting ? "Inviting..." : "Send invite"}
+                            </button>
                         </div>
                     </div>
                 </div>

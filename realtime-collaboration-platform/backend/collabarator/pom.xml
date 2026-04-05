@@ -6,7 +6,6 @@
 
 	<modelVersion>4.0.0</modelVersion>
 
-	<!-- Spring Boot Parent -->
 	<parent>
 		<groupId>org.springframework.boot</groupId>
 		<artifactId>spring-boot-starter-parent</artifactId>
@@ -24,6 +23,7 @@
 		<module>gateway-service</module>
 		<module>user-service/user-service</module>
 		<module>document-service/document-service</module>
+		<module>team-service/team-service</module>   <!-- ✅ ADD THIS -->
 	</modules>
 
 	<properties>

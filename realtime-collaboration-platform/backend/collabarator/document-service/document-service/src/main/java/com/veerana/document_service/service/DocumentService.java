@@ -13,12 +13,14 @@ import com.veerana.document_service.repository.DocumentPermissionRepository;
 import com.veerana.document_service.repository.DocumentRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
 @RequiredArgsConstructor
+@Transactional
 public class DocumentService {
 
     private final DocumentRepository documentRepository;
@@ -33,13 +35,13 @@ public class DocumentService {
         Document doc = Document.builder()
                 .title(request.title())
                 .content(request.content())
+                .ownerEmail(email)          // ✅ FIX: was missing
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
                 .build();
 
         documentRepository.save(doc);
 
-        // Create OWNER permission
         DocumentPermission ownerPermission =
                 DocumentPermission.builder()
                         .documentId(doc.getId())
@@ -55,6 +57,7 @@ public class DocumentService {
     // =========================
     // LIST MY DOCUMENTS
     // =========================
+    @Transactional(readOnly = true)
     public List<DocumentResponse> myDocuments(String email) {
 
         List<DocumentPermission> permissions =
@@ -85,7 +88,8 @@ public class DocumentService {
         }
 
         Document doc = documentRepository.findById(documentId)
-                .orElseThrow(() -> new ResourceNotFoundException("Document not found"));
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Document not found"));
 
         doc.setContent(request.getContent());
         doc.setUpdatedAt(LocalDateTime.now());
@@ -107,8 +111,9 @@ public class DocumentService {
             throw new AccessDeniedException("Only owner can delete document");
         }
 
-        documentRepository.deleteById(documentId);
+        // ✅ FIX: delete permissions FIRST, then document
         permissionRepository.deleteByDocumentId(documentId);
+        documentRepository.deleteById(documentId);
     }
 
     // =========================
@@ -142,14 +147,14 @@ public class DocumentService {
     }
 
     // =========================
-    // HELPER
+    // HELPERS
     // =========================
     private DocumentPermission getPermission(String documentId,
                                              String email) {
-
         return permissionRepository
                 .findByDocumentIdAndUserEmail(documentId, email)
-                .orElseThrow(() -> new AccessDeniedException("Access denied"));
+                .orElseThrow(() ->
+                        new AccessDeniedException("Access denied"));
     }
 
     private DocumentResponse map(Document doc) {

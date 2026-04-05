@@ -2,6 +2,7 @@ package com.veerana.document_service.repository;
 
 import com.veerana.document_service.model.DocumentPermission;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
 import java.util.List;
@@ -16,5 +17,6 @@ public interface DocumentPermissionRepository
 
     List<DocumentPermission> findByUserEmail(String userEmail);
 
+    @Transactional  // ✅ FIX: required for delete derived queries
     void deleteByDocumentId(String documentId);
 }

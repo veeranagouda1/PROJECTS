@@ -6,18 +6,19 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name="users")
+@Table(name = "users")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
 public class User {
+
     @Id
     @GeneratedValue
     private UUID id;
 
-    @Column(nullable = false)
+    @Column(nullable = false, unique = true) // ✅ FIX: unique = true prevents duplicate emails at DB level
     private String email;
 
     private String password;
@@ -49,9 +50,7 @@ public class User {
     }
 
     @PreUpdate
-    public void onUpdate(){
-        this.updatedAt=LocalDateTime.now();
+    public void onUpdate() {
+        this.updatedAt = LocalDateTime.now();
     }
-
-
 }

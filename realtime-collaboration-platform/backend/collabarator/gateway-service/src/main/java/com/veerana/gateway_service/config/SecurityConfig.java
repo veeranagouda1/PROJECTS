@@ -1,6 +1,7 @@
 package com.veerana.gateway_service.config;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.convert.converter.Converter;
@@ -12,17 +13,23 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
 import reactor.core.publisher.Mono;
 
+import java.util.List;
+
 @Configuration
 @RequiredArgsConstructor
 public class SecurityConfig {
 
     private final Converter<Jwt, Mono<AbstractAuthenticationToken>> jwtAuthenticationConverter;
 
+    // ✅ Move allowed origin to application.properties: cors.allowed-origins=http://localhost:5173
+    @Value("${cors.allowed-origins:http://localhost:5173}")
+    private String allowedOrigin;
+
     @Bean
     public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
 
         CorsConfiguration config = new CorsConfiguration();
-        config.addAllowedOrigin("http://localhost:5173");
+        config.setAllowedOrigins(List.of(allowedOrigin));
         config.addAllowedMethod("*");
         config.addAllowedHeader("*");
         config.setAllowCredentials(true);
@@ -35,6 +42,7 @@ public class SecurityConfig {
                 .csrf(ServerHttpSecurity.CsrfSpec::disable)
                 .authorizeExchange(exchange -> exchange
                         .pathMatchers("/api/auth/**").permitAll()
+                        .pathMatchers("/ws/**").permitAll()          // ✅ WebSocket upgrade
                         .pathMatchers("/api/admin/**").hasRole("ADMIN")
                         .pathMatchers("/api/user/**").hasAnyRole("USER", "ADMIN")
                         .anyExchange().authenticated()

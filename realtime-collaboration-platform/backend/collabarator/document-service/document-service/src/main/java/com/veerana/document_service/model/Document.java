@@ -1,9 +1,7 @@
 package com.veerana.document_service.model;
 
-
 import jakarta.persistence.*;
 import lombok.*;
-import jakarta.persistence.Id;
 
 import java.time.LocalDateTime;
 
@@ -25,9 +23,24 @@ public class Document {
     @Column(columnDefinition = "TEXT")
     private String content;
 
+    @Column(nullable = false)
     private String ownerEmail;
 
-    private LocalDateTime createdAt;
+    // ✅ NEW: optional team association
+    // null = personal document, set = belongs to a team
+    private String teamId;
 
+    private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+
+    @PrePersist
+    public void onCreate() {
+        this.createdAt = LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    @PreUpdate
+    public void onUpdate() {
+        this.updatedAt = LocalDateTime.now();
+    }
 }

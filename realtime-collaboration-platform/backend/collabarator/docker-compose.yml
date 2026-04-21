@@ -1,0 +1,226 @@
+version: "3.9"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# CollabX — Full Stack Docker Compose
+# Services: postgres (x5), redis, ollama, + 7 Spring Boot microservices
+#
+# Usage:
+#   docker-compose up --build          # first run (builds all jars)
+#   docker-compose up                  # subsequent runs
+#   docker-compose down -v             # stop and remove volumes
+#
+# Prerequisites:
+#   - Docker Desktop running
+#   - Each service has been built: cd <service> && mvn clean package -DskipTests
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+
+  # ── Infrastructure ──────────────────────────────────────────────────────────
+
+  postgres-auth:
+    image: postgres:16-alpine
+    container_name: postgres-auth
+    environment:
+      POSTGRES_DB: authdb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata-auth:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  postgres-document:
+    image: postgres:16-alpine
+    container_name: postgres-document
+    environment:
+      POSTGRES_DB: documentdb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata-document:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  postgres-team:
+    image: postgres:16-alpine
+    container_name: postgres-team
+    environment:
+      POSTGRES_DB: teamdb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5434:5432"
+    volumes:
+      - pgdata-team:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  postgres-user:
+    image: postgres:16-alpine
+    container_name: postgres-user
+    environment:
+      POSTGRES_DB: userdb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5435:5432"
+    volumes:
+      - pgdata-user:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+    # Pull llama3.2 on first start
+    entrypoint: ["/bin/sh", "-c", "ollama serve & sleep 5 && ollama pull llama3.2 && wait"]
+
+  # ── Microservices ────────────────────────────────────────────────────────────
+
+  auth-service:
+    build:
+      context: ./auth-service
+      dockerfile: Dockerfile
+    container_name: auth-service
+    ports:
+      - "8081:8081"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-auth:5432/authdb
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+    depends_on:
+      postgres-auth:
+        condition: service_healthy
+
+  document-service:
+    build:
+      context: ./document-service/document-service
+      dockerfile: Dockerfile
+    container_name: document-service
+    ports:
+      - "8082:8082"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-document:5432/documentdb
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+    depends_on:
+      postgres-document:
+        condition: service_healthy
+
+  team-service:
+    build:
+      context: ./team-service/team-service
+      dockerfile: Dockerfile
+    container_name: team-service
+    ports:
+      - "8083:8083"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-team:5432/teamdb
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+    depends_on:
+      postgres-team:
+        condition: service_healthy
+
+  user-service:
+    build:
+      context: ./user-service/user-service
+      dockerfile: Dockerfile
+    container_name: user-service
+    ports:
+      - "8084:8084"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-user:5432/userdb
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+    depends_on:
+      postgres-user:
+        condition: service_healthy
+
+  collaboration-service:
+    build:
+      context: ./collaboration-service
+      dockerfile: Dockerfile
+    container_name: collaboration-service
+    ports:
+      - "8086:8086"
+    environment:
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  ai-service:
+    build:
+      context: ./ai-service/ai-service
+      dockerfile: Dockerfile
+    container_name: ai-service
+    ports:
+      - "8085:8085"
+    environment:
+      SPRING_AI_OLLAMA_BASE_URL: http://ollama:11434
+    depends_on:
+      - ollama
+
+  gateway-service:
+    build:
+      context: ./gateway-service
+      dockerfile: Dockerfile
+    container_name: gateway-service
+    ports:
+      - "8080:8080"
+    environment:
+      CORS_ALLOWED_ORIGINS: http://localhost:5173
+
+    depends_on:
+      - auth-service
+      - document-service
+      - team-service
+      - user-service
+      - collaboration-service
+      - ai-service
+
+# ── Volumes ────────────────────────────────────────────────────────────────────
+volumes:
+  pgdata-auth:
+  pgdata-document:
+  pgdata-team:
+  pgdata-user:
+  ollama-data:

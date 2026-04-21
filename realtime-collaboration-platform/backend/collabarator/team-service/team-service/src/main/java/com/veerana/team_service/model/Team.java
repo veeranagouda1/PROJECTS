@@ -28,4 +28,16 @@ public class Team {
 
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+
+    // ✅ FIX: timestamps managed here, not in service layer
+    @PrePersist
+    public void onCreate() {
+        this.createdAt = LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    @PreUpdate
+    public void onUpdate() {
+        this.updatedAt = LocalDateTime.now();
+    }
 }

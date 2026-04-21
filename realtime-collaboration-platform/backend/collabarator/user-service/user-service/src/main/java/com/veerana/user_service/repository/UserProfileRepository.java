@@ -1,4 +1,4 @@
-package com.veerana.user_service.Repository;
+package com.veerana.user_service.repository; // ✅ FIX: was 'Repository' (capital R) — breaks on Linux/Docker
 
 import com.veerana.user_service.model.UserProfile;
 import org.springframework.data.jpa.repository.JpaRepository;

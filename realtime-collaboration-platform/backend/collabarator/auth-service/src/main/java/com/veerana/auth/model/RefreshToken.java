@@ -15,9 +15,9 @@ public class RefreshToken {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    private Long id;   // ✅ FIX: was accidentally typed as UUID in the repository
 
-    @Column(length = 2000,nullable = false, unique = true)
+    @Column(length = 2000, nullable = false, unique = true)
     private String token;
 
     @OneToOne

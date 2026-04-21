@@ -3,29 +3,12 @@ import { useSelector } from "react-redux";
 import Landing from "./pages/Landing";
 import Dashboard from "./pages/Dashboard";
 import AdminDashboard from "./pages/AdminDashboard";
+import Editor from "./pages/Editor";
 
-/**
- * Gateway route protection:
- *   /api/auth/**    → permitAll
- *   /api/admin/**   → hasRole("ADMIN")   → role claim = "ADMIN"
- *   /api/user/**    → hasAnyRole("USER", "ADMIN")
- *   anyExchange     → authenticated
- *
- * Frontend mirrors this:
- *   /           → public (Landing)
- *   /dashboard  → USER or ADMIN
- *   /admin      → ADMIN only
- */
 function ProtectedRoute({ children, adminOnly = false }) {
   const { accessToken, user } = useSelector((state) => state.auth);
-
   if (!accessToken) return <Navigate to="/" replace />;
-
-  if (adminOnly && user?.role !== "ADMIN") {
-    // ADMIN tried /admin but role doesn't match — shouldn't happen normally
-    return <Navigate to="/dashboard" replace />;
-  }
-
+  if (adminOnly && user?.role !== "ADMIN") return <Navigate to="/dashboard" replace />;
   return children;
 }
 
@@ -33,30 +16,21 @@ export default function App() {
   return (
     <Router>
       <Routes>
-        {/* Public */}
         <Route path="/" element={<Landing />} />
 
-        {/* USER dashboard — accessible by USER and ADMIN */}
-        <Route
-          path="/dashboard"
-          element={
-            <ProtectedRoute>
-              <Dashboard />
-            </ProtectedRoute>
-          }
-        />
+        <Route path="/dashboard" element={
+          <ProtectedRoute><Dashboard /></ProtectedRoute>
+        } />
 
-        {/* ADMIN dashboard — ADMIN only */}
-        <Route
-          path="/admin"
-          element={
-            <ProtectedRoute adminOnly>
-              <AdminDashboard />
-            </ProtectedRoute>
-          }
-        />
+        <Route path="/admin" element={
+          <ProtectedRoute adminOnly><AdminDashboard /></ProtectedRoute>
+        } />
 
-        {/* Catch-all */}
+        {/* Editor route — documentId from URL */}
+        <Route path="/editor/:documentId" element={
+          <ProtectedRoute><Editor /></ProtectedRoute>
+        } />
+
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>

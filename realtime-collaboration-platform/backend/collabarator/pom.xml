@@ -23,7 +23,9 @@
 		<module>gateway-service</module>
 		<module>user-service/user-service</module>
 		<module>document-service/document-service</module>
-		<module>team-service/team-service</module>   <!-- ✅ ADD THIS -->
+		<module>team-service/team-service</module>
+		<module>collaboration-service</module>
+		<module>ai-service/ai-service</module>
 	</modules>
 
 	<properties>

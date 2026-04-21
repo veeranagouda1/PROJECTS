@@ -29,4 +29,12 @@ public class TeamMember {
     private TeamRole role;
 
     private LocalDateTime joinedAt;
+
+    // ✅ FIX: joinedAt set automatically on first persist
+    @PrePersist
+    public void onCreate() {
+        if (this.joinedAt == null) {
+            this.joinedAt = LocalDateTime.now();
+        }
+    }
 }

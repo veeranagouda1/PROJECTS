@@ -1,8 +1,7 @@
 package com.veerana.auth.repo;
 
-import com.veerana.auth.model.User;
 import com.veerana.auth.model.RefreshToken;
-import org.hibernate.validator.constraints.UUID;
+import com.veerana.auth.model.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -13,7 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.Optional;
 
 @Repository
-public interface RefreshTokenRepository extends JpaRepository<RefreshToken, UUID> {
+public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Long> { // ✅ FIX: was @UUID (Bean Validation annotation, not a type)
 
     Optional<RefreshToken> findByToken(String token);
 

@@ -12,7 +12,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -28,23 +27,21 @@ public class TeamService {
     // =========================
     public TeamResponse createTeam(String email, CreateTeamRequest request) {
 
+        // ✅ FIX: no manual timestamps — @PrePersist on Team handles it
         Team team = Team.builder()
                 .name(request.name())
                 .description(request.description())
                 .ownerEmail(email)
-                .createdAt(LocalDateTime.now())
-                .updatedAt(LocalDateTime.now())
                 .build();
 
         teamRepository.save(team);
 
-        // Add creator as OWNER member
+        // ✅ FIX: no manual joinedAt — @PrePersist on TeamMember handles it
         memberRepository.save(
                 TeamMember.builder()
                         .teamId(team.getId())
                         .userEmail(email)
                         .role(TeamRole.OWNER)
-                        .joinedAt(LocalDateTime.now())
                         .build()
         );
 
@@ -74,10 +71,7 @@ public class TeamService {
     // =========================
     @Transactional(readOnly = true)
     public List<TeamMemberResponse> getMembers(String teamId, String email) {
-
-        // Must be a member to view
-        getMember(teamId, email);
-
+        getMember(teamId, email); // must be a member to view
         return memberRepository.findByTeamId(teamId)
                 .stream()
                 .map(this::mapMember)
@@ -87,35 +81,29 @@ public class TeamService {
     // =========================
     // INVITE MEMBER
     // =========================
-    public void inviteMember(String teamId,
-                             String requesterEmail,
-                             InviteMemberRequest request) {
+    public void inviteMember(String teamId, String requesterEmail, InviteMemberRequest request) {
 
         TeamMember requester = getMember(teamId, requesterEmail);
 
-        // Only OWNER or ADMIN can invite
         if (requester.getRole() == TeamRole.MEMBER) {
             throw new AccessDeniedException("Only OWNER or ADMIN can invite members");
         }
 
-        // Can't invite someone already in team
         memberRepository.findByTeamIdAndUserEmail(teamId, request.email())
                 .ifPresent(m -> {
                     throw new AccessDeniedException("User is already a team member");
                 });
 
-        // ADMIN cannot assign OWNER role
-        if (requester.getRole() == TeamRole.ADMIN
-                && request.role() == TeamRole.OWNER) {
+        if (requester.getRole() == TeamRole.ADMIN && request.role() == TeamRole.OWNER) {
             throw new AccessDeniedException("ADMIN cannot assign OWNER role");
         }
 
+        // ✅ FIX: no manual joinedAt
         memberRepository.save(
                 TeamMember.builder()
                         .teamId(teamId)
                         .userEmail(request.email())
                         .role(request.role())
-                        .joinedAt(LocalDateTime.now())
                         .build()
         );
     }
@@ -123,9 +111,7 @@ public class TeamService {
     // =========================
     // REMOVE MEMBER
     // =========================
-    public void removeMember(String teamId,
-                             String requesterEmail,
-                             String targetEmail) {
+    public void removeMember(String teamId, String requesterEmail, String targetEmail) {
 
         TeamMember requester = getMember(teamId, requesterEmail);
 
@@ -135,7 +121,6 @@ public class TeamService {
 
         TeamMember target = getMember(teamId, targetEmail);
 
-        // Cannot remove OWNER
         if (target.getRole() == TeamRole.OWNER) {
             throw new AccessDeniedException("Cannot remove team OWNER");
         }
@@ -164,8 +149,7 @@ public class TeamService {
     private TeamMember getMember(String teamId, String email) {
         return memberRepository
                 .findByTeamIdAndUserEmail(teamId, email)
-                .orElseThrow(() ->
-                        new AccessDeniedException("You are not a member of this team"));
+                .orElseThrow(() -> new AccessDeniedException("You are not a member of this team"));
     }
 
     private TeamResponse map(Team team) {

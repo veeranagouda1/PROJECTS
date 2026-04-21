@@ -16,70 +16,59 @@ public class DocumentController {
 
     private final DocumentService service;
 
-    // =========================
-    // CREATE
-    // =========================
     @PostMapping
     public ResponseEntity<?> create(
             @RequestBody CreateDocumentRequest request,
             Authentication authentication
     ) {
-        String email = authentication.getName();
-        return ResponseEntity.ok(
-                service.create(email, request)
-        );
+        return ResponseEntity.ok(service.create(authentication.getName(), request));
     }
 
-    // =========================
-    // LIST
-    // =========================
     @GetMapping
     public ResponseEntity<?> myDocs(Authentication authentication) {
-        String email = authentication.getName();
-        return ResponseEntity.ok(
-                service.myDocuments(email)
-        );
+        return ResponseEntity.ok(service.myDocuments(authentication.getName()));
     }
 
-    // =========================
-    // UPDATE
-    // =========================
+    @GetMapping("/{id}")
+    public ResponseEntity<?> getById(
+            @PathVariable String id,
+            Authentication authentication
+    ) {
+        return ResponseEntity.ok(service.getById(id, authentication.getName()));
+    }
+
+    // ✅ NEW: get all documents for a team
+    // Frontend calls this when user views a team's documents
+    @GetMapping("/team/{teamId}")
+    public ResponseEntity<?> getByTeam(@PathVariable String teamId) {
+        return ResponseEntity.ok(service.getByTeam(teamId));
+    }
+
     @PutMapping("/{id}")
     public ResponseEntity<?> update(
             @PathVariable String id,
             @RequestBody UpdateDocumentRequest request,
             Authentication authentication
     ) {
-        String email = authentication.getName();
-        return ResponseEntity.ok(
-                service.update(id, email, request)
-        );
+        return ResponseEntity.ok(service.update(id, authentication.getName(), request));
     }
 
-    // =========================
-    // DELETE
-    // =========================
     @DeleteMapping("/{id}")
     public ResponseEntity<?> delete(
             @PathVariable String id,
             Authentication authentication
     ) {
-        String email = authentication.getName();
-        service.delete(id, email);
+        service.delete(id, authentication.getName());
         return ResponseEntity.ok("Deleted successfully");
     }
 
-    // =========================
-    // SHARE
-    // =========================
     @PostMapping("/{id}/share")
     public ResponseEntity<?> share(
             @PathVariable String id,
             @RequestBody ShareRequest request,
             Authentication authentication
     ) {
-        String email = authentication.getName();
-        service.share(id, email, request);
+        service.share(id, authentication.getName(), request);
         return ResponseEntity.ok("Shared successfully");
     }
 }
